@@ -7,4 +7,4 @@ ctfd_repo_url: "https://github.com/CTFd/CTFd.git"
 ctfd_version: "v3.7.3"
 
 # ctfd-chall-manager 前端外掛
-ctfd_chall_manager_version: "v0.8.0"
+ctfd_chall_manager_version: "v0.8.3"
