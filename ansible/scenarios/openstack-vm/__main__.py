@@ -11,6 +11,7 @@ openstack-vm scenario for chall-manager
 """
 
 import hashlib
+import hmac
 import os
 
 import pulumi
@@ -41,29 +42,19 @@ prefix = f"ctf-{short_id}"
 # ── 動態 flag（每個 identity 產生不同的 flag）────────────────
 def variate_flag(ident: str, flag: str) -> str:
     """
-    以 identity + base_flag 的 SHA-256 作為 PRNG seed，
-    對 flag 中可替換的字元做視覺相近替換，
-    使每位玩家拿到的 flag 字串唯一。
+    用 HMAC-SHA256(key=base_flag, msg=identity) 產生唯一後綴。
+    純 ASCII，避免 Unicode 同形字造成 CTFd flag 比對失敗或
+    玩家複製貼上時出現肉眼看不出的差異。
+
+    例：base_flag="pwn_me", identity="user-001"
+        → "pwn_me_3f2a1b4c5d6e"
     """
-    seed = int.from_bytes(
-        hashlib.sha256(f"{ident}:{flag}".encode()).digest()[:8], "big"
-    )
-    alike: dict[str, list[str]] = {
-        "a": ["a", "а", "ａ"],   # ASCII / 西里爾 / 全形
-        "e": ["e", "е", "ｅ"],
-        "o": ["o", "о", "ｏ"],
-        "i": ["i", "і", "ｉ"],
-        "c": ["c", "с", "ｃ"],
-        "s": ["s", "ѕ", "ｓ"],
-    }
-    result = []
-    for ch in flag:
-        if ch in alike:
-            seed = (seed * 6364136223846793005 + 1442695040888963407) & 0xFFFFFFFFFFFFFFFF
-            result.append(alike[ch][seed % len(alike[ch])])
-        else:
-            result.append(ch)
-    return "".join(result)
+    sig = hmac.new(
+        flag.encode("utf-8"),
+        ident.encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()[:12]
+    return f"{flag}_{sig}"
 
 
 # ── Security Group（每個 instance 獨立）────────────────────────

@@ -150,8 +150,10 @@
     rm -f "${zip_file}"
     zip -r "${zip_file}" . \
       -x "*.git*" \
+      -x "venv/*" \
       -x "__pycache__/*" \
       -x "*.pyc" \
+      -x "*.egg-info/*" \
       -x "Dockerfile" \
       -x ".DS_Store"
 

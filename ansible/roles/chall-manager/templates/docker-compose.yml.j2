@@ -51,7 +51,9 @@ services:
       PULUMI_CONFIG_PASSPHRASE: ""
 
     volumes:
-      - {{ chall_manager_scenarios_dir }}:/scenarios:ro
+      # ✅ 不加 :ro：chall-manager 執行 Pulumi 時可能需要寫入暫存檔
+      # Pulumi state 已獨立掛載到 pulumi-state volume
+      - {{ chall_manager_scenarios_dir }}:/scenarios
       - pulumi-state:/pulumi-state
     depends_on:
       etcd:
