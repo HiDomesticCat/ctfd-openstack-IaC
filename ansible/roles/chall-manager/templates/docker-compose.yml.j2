@@ -1,0 +1,70 @@
+# chall-manager docker-compose（由 Ansible 渲染）
+# 參考文件：https://github.com/ctfer-io/chall-manager
+
+services:
+  # ── 本機 OCI Registry ──────────────────────────────────────
+  # 存放 scenario OCI images，不需要 Docker Hub 帳號
+  registry:
+    image: registry:2
+    restart: unless-stopped
+    ports:
+      - "{{ registry_port }}:5000"
+    volumes:
+      - registry-data:/var/lib/registry
+
+  # ── chall-manager 後端微服務 ───────────────────────────────
+  chall-manager:
+    image: ctferio/chall-manager:{{ chall_manager_version }}
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:{{ chall_manager_port }}:8080"
+    environment:
+      # 分散式鎖後端
+      CM_LOCK: etcd
+      CM_LOCK_ETCD_ENDPOINTS: "etcd:2379"
+
+      # Scenarios 目錄（對應到 volumes 掛載）
+      CM_DIRECTORY: /scenarios
+
+      # OpenStack 憑證（供 Pulumi scenario 使用）
+      OS_AUTH_URL: "{{ openstack_auth_url }}"
+      OS_PROJECT_NAME: "{{ openstack_project_name }}"
+      OS_USERNAME: "{{ openstack_username }}"
+      OS_PASSWORD: "{{ openstack_password }}"
+      OS_REGION_NAME: "{{ openstack_region }}"
+      OS_USER_DOMAIN_NAME: "{{ openstack_user_domain }}"
+      OS_PROJECT_DOMAIN_NAME: "{{ openstack_project_domain }}"
+      OS_IDENTITY_API_VERSION: "3"
+
+      # Pulumi local backend（不需要 Pulumi Cloud 帳號）
+      PULUMI_BACKEND_URL: "file:///pulumi-state"
+      PULUMI_CONFIG_PASSPHRASE: ""
+
+    volumes:
+      - {{ chall_manager_scenarios_dir }}:/scenarios:ro
+      - pulumi-state:/pulumi-state
+    depends_on:
+      etcd:
+        condition: service_healthy
+      registry:
+        condition: service_started
+
+  # ── 分散式鎖：etcd ─────────────────────────────────────────
+  etcd:
+    image: {{ etcd_image }}
+    restart: unless-stopped
+    environment:
+      ETCD_LISTEN_CLIENT_URLS: "http://0.0.0.0:2379"
+      ETCD_ADVERTISE_CLIENT_URLS: "http://etcd:2379"
+    healthcheck:
+      test: ["CMD", "etcdctl", "--endpoints=http://localhost:2379", "endpoint", "health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    volumes:
+      - etcd-data:/var/etcd
+
+volumes:
+  registry-data:
+  pulumi-state:
+  etcd-data:

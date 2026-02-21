@@ -1,0 +1,8 @@
+# roles/ctfd/vars/main.yml
+
+ctfd_deploy_dir: "/opt/ctfd"
+ctfd_repo_url: "https://github.com/CTFd/CTFd.git"
+ctfd_version: "master"
+
+# ctfd-chall-manager 前端外掛
+ctfd_chall_manager_version: "main"

@@ -1,0 +1,35 @@
+# ── Terraform / OpenTofu ──────────────────────────────────
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+.terraform/
+.terraform.lock.hcl
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# ── Ansible ───────────────────────────────────────────────
+# 主機清單（含真實 IP 與 SSH 金鑰路徑）
+ansible/inventory/hosts.ini
+
+# Ansible Vault 實際檔案
+ansible/group_vars/all/vault.yml
+
+# Ansible retry 紀錄
+*.retry
+
+# ── 金鑰 / 憑證 ───────────────────────────────────────────
+*.pem
+*.key
+secrets/
+
+# ── 系統 / 編輯器 ─────────────────────────────────────────
+.DS_Store
+.idea/
+.vscode/settings.json
+__pycache__/
+*.pyc

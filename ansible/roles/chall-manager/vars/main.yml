@@ -1,0 +1,28 @@
+# roles/chall-manager/vars/main.yml
+
+chall_manager_dir: "/opt/chall-manager"
+chall_manager_port: 8080      # chall-manager API port（僅供 CTFd 內部呼叫，不對外）
+chall_manager_version: "latest"
+
+# Pulumi scenarios 目錄（存放各 challenge 的靶機定義）
+chall_manager_scenarios_dir: "/opt/chall-manager/scenarios"
+
+# 本機 Docker Registry（供 chall-manager 存取 scenario OCI images）
+registry_port: 5000
+registry_host: "localhost"
+registry_url: "{{ registry_host }}:{{ registry_port }}"
+
+# etcd image（官方版本，bitnami:3 已失效）
+etcd_image: "gcr.io/etcd-development/etcd:v3.5.13"
+
+# OpenStack 連線資訊（給 Pulumi scenario 使用）
+# 敏感資訊請使用 ansible-vault 加密後放在 group_vars/all/vault.yml
+# 執行: ansible-vault encrypt group_vars/all/vault.yml
+# 或單一欄位: ansible-vault encrypt_string 'your-password' --name 'vault_openstack_password'
+openstack_auth_url: "{{ vault_openstack_auth_url }}"
+openstack_project_name: "{{ vault_openstack_project_name }}"
+openstack_username: "{{ vault_openstack_username }}"
+openstack_password: "{{ vault_openstack_password }}"
+openstack_region: "{{ vault_openstack_region | default('RegionOne') }}"
+openstack_user_domain: "{{ vault_openstack_user_domain | default('Default') }}"
+openstack_project_domain: "{{ vault_openstack_project_domain | default('Default') }}"

@@ -1,0 +1,109 @@
+# roles/ctfd/tasks/main.yml
+
+# ── 基礎套件 ──────────────────────────────────────────────
+- name: 確保基礎套件已安裝
+  apt:
+    name:
+      - git
+      - curl
+      - apt-transport-https
+      - ca-certificates
+      - gnupg
+      - lsb-release
+      - software-properties-common
+    state: present
+    update_cache: yes
+
+# ── Docker 官方倉庫（提供 docker-buildx-plugin）──────────────
+- name: 建立 apt keyrings 目錄
+  file:
+    path: /etc/apt/keyrings
+    state: directory
+    mode: "0755"
+
+- name: 下載 Docker 官方 GPG 金鑰
+  get_url:
+    url: https://download.docker.com/linux/ubuntu/gpg
+    dest: /etc/apt/keyrings/docker.asc
+    mode: "0644"
+    force: false
+
+- name: 取得系統架構
+  command: dpkg --print-architecture
+  register: dpkg_arch
+  changed_when: false
+
+- name: 加入 Docker 官方 apt 倉庫
+  apt_repository:
+    repo: >-
+      deb [arch={{ dpkg_arch.stdout }} signed-by=/etc/apt/keyrings/docker.asc]
+      https://download.docker.com/linux/ubuntu
+      {{ ansible_distribution_release }} stable
+    state: present
+    filename: docker
+    update_cache: yes
+
+- name: 安裝 docker-buildx-plugin
+  apt:
+    name: docker-buildx-plugin
+    state: present
+
+# ── Docker 服務 ───────────────────────────────────────────
+- name: 確保 Docker 服務已啟動並設為開機啟動
+  systemd:
+    name: docker
+    state: started
+    enabled: yes
+
+- name: 確保 ubuntu 使用者在 docker 群組
+  user:
+    name: ubuntu
+    groups: docker
+    append: yes
+
+# ── CTFd 本體 ───────────────────────────────────────────────
+- name: 建立 CTFd 部署目錄
+  file:
+    path: "{{ ctfd_deploy_dir }}"
+    state: directory
+    mode: "0755"
+    owner: ubuntu
+    group: ubuntu
+
+- name: Git Clone CTFd 原始碼
+  git:
+    repo: "{{ ctfd_repo_url }}"
+    dest: "{{ ctfd_deploy_dir }}"
+    version: "{{ ctfd_version }}"
+    force: yes
+
+# ── ctfd-chall-manager 外掛 ────────────────────────────────
+- name: 確保 CTFd plugins 目錄存在
+  file:
+    path: "{{ ctfd_deploy_dir }}/CTFd/plugins"
+    state: directory
+    mode: "0755"
+
+- name: 安裝 ctfd-chall-manager 外掛
+  git:
+    repo: "https://github.com/ctfer-io/ctfd-chall-manager.git"
+    dest: "{{ ctfd_deploy_dir }}/CTFd/plugins/ctfd_chall_manager"
+    version: "{{ ctfd_chall_manager_version }}"
+    force: yes
+  notify: 重新啟動 CTFd
+
+# ── 清除幽靈資料夾（根本原因防禦）────────────────────────────
+# 真正的 duplicate 來源：CTFd 載入了帶連字號的幽靈資料夾
+# (ctfd-chall-manager/) 和帶底線的真正外掛 (ctfd_chall_manager/)，
+# 造成同一個 endpoint 被登記兩次。
+# 確保連字號版本不存在即可解決問題，不需要動外掛原始碼。
+- name: 確保不存在幽靈資料夾（ctfd-chall-manager，連字號版本）
+  file:
+    path: "{{ ctfd_deploy_dir }}/CTFd/plugins/ctfd-chall-manager"
+    state: absent
+
+# ── 啟動 CTFd ──────────────────────────────────────────────
+- name: 啟動 CTFd Docker Compose
+  community.docker.docker_compose_v2:
+    project_src: "{{ ctfd_deploy_dir }}"
+    state: present

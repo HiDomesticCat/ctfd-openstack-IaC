@@ -1,0 +1,36 @@
+# ctfd-openstack/terraform.tfvars.example
+# 複製此檔案為 terraform.tfvars 並填入實際值
+# 重要：terraform.tfvars 已加入 .gitignore，請勿手動提交
+
+# ── Provider ───────────────────────────────────────────────
+# clouds.yaml 中的 cloud entry 名稱（ctfd-deployer 帳號）
+openstack_cloud = "ctfd"
+
+# ── 從 platform 取得的值 ────────────────────────────────────
+# 執行 cd ../platform && tofu output 後複製以下兩個值
+
+# platform output: module.external_network.network_id
+external_network_id = "PASTE_FROM_PLATFORM_OUTPUT"
+
+# platform output: module.images.image_ids["ubuntu"]  (或使用 image 名稱查 OpenStack)
+image_id = "PASTE_FROM_PLATFORM_OUTPUT"
+
+# ── SSH ────────────────────────────────────────────────────
+keypair_name    = "ctfd-key"
+public_key_path = "/root/.ssh/id_rsa.pub"
+
+# 建議限制為管理 IP，例如 "203.0.113.0/24"
+# ssh_allowed_cidr = "0.0.0.0/0"
+
+# ── Network ────────────────────────────────────────────────
+internal_subnet_cidr = "192.168.100.0/24"
+
+# ── Instance ───────────────────────────────────────────────
+flavor_name   = "general.medium"
+instance_name = "ctfd-server"
+
+# Floating IP 所在的外部網路名稱（與 platform network_name 一致）
+floating_ip_pool = "public"
+
+# CTFd 應用程式 Port
+ctfd_port = 8000

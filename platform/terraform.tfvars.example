@@ -1,0 +1,13 @@
+# terraform.tfvars.example
+# 複製此檔案為 terraform.tfvars 並填入實際值
+# 重要：不要將 terraform.tfvars 提交到版本控制
+
+# 環境設定（dev, staging, production）
+# production 環境會啟用刪除保護
+environment = "production"
+
+# OpenStack cloud 名稱（對應 ~/.config/openstack/clouds.yaml）
+openstack_cloud = "openstack"
+
+# CTFd 部署帳號密碼（至少 12 字元，需包含大小寫字母和數字）
+ctfd_deployer_password = "請改為強密碼-至少12字元-包含大小寫和數字"

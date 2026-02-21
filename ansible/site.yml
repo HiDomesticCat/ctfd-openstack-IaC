@@ -1,0 +1,13 @@
+# ~/tofu_iac/ansible/site.yml
+
+- name: 部署 CTFd 平台環境
+  hosts: ctfd
+  become: yes
+  roles:
+    - ctfd           # CTFd 本體 + ctfd-chall-manager 外掛
+
+- name: 部署 chall-manager 靶機引擎
+  hosts: ctfd        # 與 CTFd 同機部署；之後可獨立出去
+  become: yes
+  roles:
+    - chall-manager  # chall-manager 後端微服務

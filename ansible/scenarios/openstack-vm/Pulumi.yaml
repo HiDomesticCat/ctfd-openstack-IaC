@@ -1,0 +1,39 @@
+# Pulumi 專案設定
+# 這個 scenario 會為每位玩家建立一台獨立的 OpenStack VM 靶機
+# 由 chall-manager 自動呼叫，不需要手動執行
+
+name: openstack-vm
+runtime:
+  name: python
+  options:
+    virtualenv: venv
+
+description: |
+  CTF 靶機 Scenario：為每位玩家動態建立 OpenStack VM
+  - 建立獨立的 Security Group
+  - 建立 VM 並分配 Floating IP
+  - 輸出玩家連線資訊（IP、flag URL）
+  chall-manager 的 Janitor 會在時間到期後自動清理
+
+config:
+  # 這些值由 chall-manager 在每次部署時傳入
+  openstack-vm-challenge:player_id:
+    description: "玩家 ID（由 chall-manager 提供）"
+  openstack-vm-challenge:challenge_id:
+    description: "題目 ID（由 chall-manager 提供）"
+  # 以下為題目設定，固定值
+  openstack-vm-challenge:image_id:
+    description: "靶機 Image ID（從 platform 取得）"
+    default: "REPLACE_WITH_IMAGE_ID"
+  openstack-vm-challenge:flavor_name:
+    description: "靶機規格"
+    default: "general.small"
+  openstack-vm-challenge:network_id:
+    description: "連接的內部網路 ID"
+    default: "REPLACE_WITH_NETWORK_ID"
+  openstack-vm-challenge:floating_ip_pool:
+    description: "Floating IP 所在外部網路"
+    default: "public"
+  openstack-vm-challenge:challenge_port:
+    description: "題目對外 Port"
+    default: "8080"

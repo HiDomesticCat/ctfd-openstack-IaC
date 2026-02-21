@@ -1,0 +1,17 @@
+# ansible-vault 加密範本
+# 使用方式:
+#   cp vault.yml.example vault.yml
+#   ansible-vault encrypt vault.yml
+#
+# 之後執行 ansible-playbook 時加上:
+#   ansible-playbook site.yml --ask-vault-pass
+#   或使用 vault password file:
+#   ansible-playbook site.yml --vault-password-file ~/.vault_pass
+
+vault_openstack_auth_url: "http://<OPENSTACK_IP>:5000/v3"
+vault_openstack_project_name: "<PROJECT_NAME>"
+vault_openstack_username: "<USERNAME>"
+vault_openstack_password: "<PASSWORD>"
+vault_openstack_region: "RegionOne"
+vault_openstack_user_domain: "Default"
+vault_openstack_project_domain: "Default"

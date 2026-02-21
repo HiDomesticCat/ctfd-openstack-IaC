@@ -1,0 +1,8 @@
+# 主機清單（含真實 IP 與 SSH 金鑰路徑）
+inventory/hosts.ini
+
+# Ansible Vault 已加密的實際 vault 檔案
+group_vars/all/vault.yml
+
+# 其他敏感資訊
+*.retry

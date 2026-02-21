@@ -1,0 +1,52 @@
+#!/bin/bash
+# tofu-safe - OpenTofu 包裝腳本，提供基於環境的刪除保護
+
+set -e
+
+# 顏色輸出
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
+# 讀取環境變數
+ENVIRONMENT=${TF_VAR_environment:-production}
+
+# 從 terraform.tfvars 讀取（如果環境變數未設定）
+if [[ -z "${TF_VAR_environment}" ]] && [[ -f "terraform.tfvars" ]]; then
+    TFVARS_ENV=$(grep '^environment' terraform.tfvars | sed 's/environment[[:space:]]*=[[:space:]]*"\(.*\)"/\1/' | tr -d ' ')
+    if [[ -n "$TFVARS_ENV" ]]; then
+        ENVIRONMENT="$TFVARS_ENV"
+    fi
+fi
+
+echo -e "${YELLOW}📋 當前環境: ${ENVIRONMENT}${NC}"
+
+# 檢查是否是刪除操作
+if [[ "$1" == "destroy" ]]; then
+    if [[ "$ENVIRONMENT" == "production" ]]; then
+        echo -e "${RED}❌ 錯誤：不允許刪除生產環境！${NC}"
+        echo ""
+        echo "如果確實需要刪除生產環境，請使用以下任一方法："
+        echo ""
+        echo "方法 1: 臨時設定環境變數"
+        echo "  export TF_VAR_environment=\"staging\""
+        echo "  ./tofu-safe destroy"
+        echo ""
+        echo "方法 2: 修改 terraform.tfvars"
+        echo "  # 將 environment = \"production\" 改為 \"staging\""
+        echo "  ./tofu-safe destroy"
+        echo ""
+        echo "方法 3: 直接使用 tofu（繞過保護，不推薦）"
+        echo "  tofu destroy"
+        echo ""
+        exit 1
+    else
+        echo -e "${YELLOW}⚠️  警告：即將刪除 ${ENVIRONMENT} 環境的所有資源${NC}"
+        echo ""
+    fi
+fi
+
+# 執行 tofu 命令
+echo -e "${GREEN}▶️  執行: tofu $@${NC}"
+tofu "$@"
