@@ -6,7 +6,9 @@
 //   - Output key : connection_info        （玩家連線 URL，必填）
 //   - Output key : flag                   （動態 flag，選填）
 //
-// 設定來源：環境變數（由 chall-manager docker-compose 繼承）
+// NOTE: 使用 pulumi-openstack SDK v3 (terraform-provider-openstack v1.x)
+//       SDK v4.1.0 對應的 terraform-provider-openstack v2.1.0 有 nil panic bug：
+//       panic: interface conversion: interface {} is nil @ configureProvider/getOkExists
 package main
 
 import (
@@ -17,9 +19,9 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/pulumi/pulumi-openstack/sdk/v4/go/openstack"
-	"github.com/pulumi/pulumi-openstack/sdk/v4/go/openstack/compute"
-	"github.com/pulumi/pulumi-openstack/sdk/v4/go/openstack/networking"
+	"github.com/pulumi/pulumi-openstack/sdk/v3/go/openstack"
+	"github.com/pulumi/pulumi-openstack/sdk/v3/go/openstack/compute"
+	"github.com/pulumi/pulumi-openstack/sdk/v3/go/openstack/networking"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi/config"
 )
@@ -47,10 +49,7 @@ func run(ctx *pulumi.Context) error {
 		return fmt.Errorf("invalid CHALLENGE_PORT %q: %w", challengePortStr, err)
 	}
 
-	// ── 明確配置 OpenStack provider ──────────────────────────
-	// ✅ 修復 terraform-provider-openstack v2.1.0 的 nil panic：
-	//    自動從 env vars 配置時 configureProvider 會 panic，
-	//    改為在 Go 程式中明確傳入所有必要參數。
+	// ── 明確配置 OpenStack provider（繞過 env auto-detect bug）──
 	osProvider, err := openstack.NewProvider(ctx, "openstack", &openstack.ProviderArgs{
 		AuthUrl:           pulumi.StringPtr(requireEnv("OS_AUTH_URL")),
 		UserName:          pulumi.StringPtr(requireEnv("OS_USERNAME")),
@@ -136,12 +135,10 @@ func run(ctx *pulumi.Context) error {
 	}
 
 	// ── Outputs ───────────────────────────────────────────────
-	// ✅ connection_info：chall-manager 必填 output
 	ctx.Export("connection_info", fip.Address.ApplyT(func(ip string) string {
 		return fmt.Sprintf("http://%s:%d", ip, challengePort)
 	}).(pulumi.StringOutput))
 
-	// ✅ flag：HMAC-SHA256，每個 identity 產生唯一純 ASCII flag
 	ctx.Export("flag", pulumi.String(
 		fmt.Sprintf("%s{%s}", flagPrefix, variateFlag(identity, baseFlag)),
 	))
@@ -156,7 +153,6 @@ func run(ctx *pulumi.Context) error {
 }
 
 // variateFlag 用 HMAC-SHA256(key=baseFlag, msg=identity) 產生唯一後綴
-// 輸出純 ASCII，避免 CTFd flag 比對因 Unicode 失敗
 func variateFlag(identity, baseFlag string) string {
 	mac := hmac.New(sha256.New, []byte(baseFlag))
 	mac.Write([]byte(identity))
