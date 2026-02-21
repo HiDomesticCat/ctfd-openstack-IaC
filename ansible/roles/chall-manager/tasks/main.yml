@@ -205,15 +205,20 @@
     prev_hash=$(cat "${state_file}" 2>/dev/null || echo "")
 
     # ── Push：每個檔案為獨立 layer（chall-manager 規範格式）──
-    # Minimal artifact：Pulumi.yml + main binary
+    # Minimal artifact：Pulumi.yaml + main binary
+    # ✅ 推送 Pulumi.yaml（chall-manager cache 以 .yaml 副檔名索引，不接受 .yml）
     echo "==> Pushing OCI artifact → ${image_tag} ..."
+    pulumi_file="Pulumi.yaml"
+    if [ ! -f "${pulumi_file}" ] && [ -f "Pulumi.yml" ]; then
+      pulumi_file="Pulumi.yml"
+    fi
     oras push \
       --insecure \
       --disable-path-validation \
       --artifact-type application/vnd.ctfer-io.scenario \
       "${image_tag}" \
       main:application/vnd.ctfer-io.file \
-      Pulumi.yml:application/vnd.ctfer-io.file
+      "${pulumi_file}:application/vnd.ctfer-io.file"
 
     # ── 變更偵測，決定是否重啟 chall-manager ────────────────
     if [ "${src_hash}" != "${prev_hash}" ]; then
