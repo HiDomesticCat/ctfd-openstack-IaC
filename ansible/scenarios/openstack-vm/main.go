@@ -126,10 +126,13 @@ func run(ctx *pulumi.Context) error {
 		return err
 	}
 
-	// ✅ 直接用 instance_id 綁定，避免 Port data source 競速問題
-	if _, err = compute.NewFloatingIpAssociate(ctx, prefix+"-fip-assoc", &compute.FloatingIpAssociateArgs{
+	// ✅ 用 networking.FloatingIpAssociate + port ID（從 instance output 讀取，非 data source）
+	// compute.FloatingIpAssociate 在 terraform-provider-openstack v1.x 不存在；
+	// instance.Networks.Index(0).Port() 是 instance 建立後的 attribute，不需要額外 API 呼叫
+	portID := instance.Networks.Index(pulumi.Int(0)).Port()
+	if _, err = networking.NewFloatingIpAssociate(ctx, prefix+"-fip-assoc", &networking.FloatingIpAssociateArgs{
 		FloatingIp: fip.Address,
-		InstanceId: instance.ID(),
+		PortId:     portID,
 	}, prov, pulumi.DependsOn([]pulumi.Resource{fip, instance})); err != nil {
 		return err
 	}
