@@ -7,7 +7,7 @@ chall_manager_version: "latest"
 # Pulumi scenarios 目錄（存放各 challenge 的靶機定義）
 chall_manager_scenarios_dir: "/opt/chall-manager/scenarios"
 
-# 本機 Docker Registry（供 chall-manager 存取 scenario OCI images）
+# 本機 Docker Registry（供 chall-manager 存取 scenario OCI artifact）
 registry_port: 5000
 registry_host: "localhost"
 registry_url: "{{ registry_host }}:{{ registry_port }}"
@@ -26,3 +26,19 @@ openstack_password: "{{ vault_openstack_password }}"
 openstack_region: "{{ vault_openstack_region | default('RegionOne') }}"
 openstack_user_domain: "{{ vault_openstack_user_domain | default('Default') }}"
 openstack_project_domain: "{{ vault_openstack_project_domain | default('Default') }}"
+
+# ── 題目（Scenario）設定 ─────────────────────────────────────
+# 這些值會透過 docker-compose 環境變數傳給 Pulumi scenario (__main__.py)
+# REPLACE_WITH_* 請填入 platform tofu apply 後取得的實際 UUID
+challenge_image_id: "REPLACE_WITH_IMAGE_UUID"       # platform 建立的 Ubuntu image UUID
+challenge_network_id: "REPLACE_WITH_NETWORK_UUID"   # CTFd 內部網路 UUID
+challenge_flavor: "general.small"
+challenge_port: "8080"
+challenge_fip_pool: "public"
+
+# 動態 flag 設定（base_flag 會依 identity 產生每人不同的 flag）
+challenge_base_flag: "replace_this_with_your_real_flag"
+challenge_flag_prefix: "CTF"
+
+# oras CLI 版本（用來推送 OCI artifact 到 local registry）
+oras_version: "1.2.0"

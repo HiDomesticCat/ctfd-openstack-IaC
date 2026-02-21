@@ -3,7 +3,7 @@
 
 services:
   # ── 本機 OCI Registry ──────────────────────────────────────
-  # 存放 scenario OCI images，不需要 Docker Hub 帳號
+  # 存放 scenario OCI artifact（zip），不需要 Docker Hub 帳號
   registry:
     image: registry:2
     restart: unless-stopped
@@ -26,7 +26,7 @@ services:
       # Scenarios 目錄（對應到 volumes 掛載）
       CM_DIRECTORY: /scenarios
 
-      # OpenStack 憑證（供 Pulumi scenario 使用）
+      # OpenStack 憑證（由 Pulumi scenario 程式繼承使用）
       OS_AUTH_URL: "{{ openstack_auth_url }}"
       OS_PROJECT_NAME: "{{ openstack_project_name }}"
       OS_USERNAME: "{{ openstack_username }}"
@@ -35,6 +35,16 @@ services:
       OS_USER_DOMAIN_NAME: "{{ openstack_user_domain }}"
       OS_PROJECT_DOMAIN_NAME: "{{ openstack_project_domain }}"
       OS_IDENTITY_API_VERSION: "3"
+
+      # ── 題目設定（Pulumi __main__.py 從環境變數讀取）─────────
+      # chall-manager 容器啟動的 Pulumi 子程序會繼承以下 env vars
+      CHALLENGE_IMAGE_ID: "{{ challenge_image_id }}"
+      CHALLENGE_NETWORK_ID: "{{ challenge_network_id }}"
+      CHALLENGE_FLAVOR: "{{ challenge_flavor | default('general.small') }}"
+      CHALLENGE_PORT: "{{ challenge_port | default('8080') }}"
+      CHALLENGE_FIP_POOL: "{{ challenge_fip_pool | default('public') }}"
+      CHALLENGE_BASE_FLAG: "{{ challenge_base_flag | default('replace_me') }}"
+      CHALLENGE_FLAG_PREFIX: "{{ challenge_flag_prefix | default('CTF') }}"
 
       # Pulumi local backend（不需要 Pulumi Cloud 帳號）
       PULUMI_BACKEND_URL: "file:///pulumi-state"

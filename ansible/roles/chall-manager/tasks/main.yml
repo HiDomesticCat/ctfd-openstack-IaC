@@ -24,6 +24,38 @@
     state: restarted
   when: docker_daemon_updated.changed
 
+# ── 安裝 oras CLI（推送 OCI artifact 到 local registry）────────
+# chall-manager 的 scenario 是 zip OCI artifact，不是 Docker image
+- name: 檢查 oras 是否已安裝且版本正確
+  shell: oras version 2>/dev/null | grep -q "{{ oras_version }}" && echo "ok" || echo "missing"
+  args:
+    executable: /bin/bash
+  register: oras_check
+  changed_when: false
+
+- name: 安裝 oras CLI v{{ oras_version }}
+  block:
+    - name: 下載 oras 壓縮包
+      get_url:
+        url: "https://github.com/oras-project/oras/releases/download/v{{ oras_version }}/oras_{{ oras_version }}_linux_amd64.tar.gz"
+        dest: "/tmp/oras_{{ oras_version }}.tar.gz"
+        mode: "0644"
+
+    - name: 解壓 oras 到 /usr/local/bin
+      unarchive:
+        src: "/tmp/oras_{{ oras_version }}.tar.gz"
+        dest: /usr/local/bin/
+        remote_src: yes
+        include:
+          - oras
+        mode: "0755"
+
+    - name: 清理暫存壓縮包
+      file:
+        path: "/tmp/oras_{{ oras_version }}.tar.gz"
+        state: absent
+  when: oras_check.stdout != "ok"
+
 # ── 建立目錄 ──────────────────────────────────────────────
 - name: 建立 chall-manager 根目錄
   file:
@@ -87,35 +119,56 @@
   retries: 12
   delay: 5
 
-# ── Build + Push scenario OCI images ─────────────────────────
-# 逐一處理 scenarios/ 下有 Dockerfile 的目錄
-- name: 找出所有含 Dockerfile 的 scenario 目錄
+# ── Build + Push scenario 為 OCI artifact（zip）──────────────
+# chall-manager 讀取的是 zip 格式的 OCI artifact，不是 Docker image
+# 使用 oras CLI 推送 zip 到 local registry
+- name: 找出所有含 Pulumi.yaml 的 scenario 目錄
   find:
     paths: "{{ chall_manager_scenarios_dir }}"
-    patterns: "Dockerfile"
+    patterns: "Pulumi.yaml"
     recurse: yes
-  register: scenario_dockerfiles
+  register: scenario_pulumifiles
 
-- name: Build + Push 各 scenario OCI image
+- name: 安裝 Python venv 並打包各 scenario 為 OCI artifact
   shell: |
+    set -e
     scenario_dir="{{ item.path | dirname }}"
     scenario_name="{{ item.path | dirname | basename }}"
     image_tag="{{ registry_url }}/${scenario_name}:latest"
+    zip_file="/tmp/${scenario_name}.zip"
 
-    echo "==> Building ${image_tag} ..."
-    docker build -t "${image_tag}" "${scenario_dir}"
+    echo "==> Preparing Python venv for ${scenario_name} ..."
+    cd "${scenario_dir}"
 
-    echo "==> Pushing ${image_tag} ..."
-    docker push "${image_tag}"
+    if [ -f requirements.txt ]; then
+      python3 -m venv venv
+      venv/bin/pip install -q --upgrade pip
+      venv/bin/pip install -q -r requirements.txt
+    fi
 
+    echo "==> Packaging ${scenario_name} as OCI artifact zip ..."
+    rm -f "${zip_file}"
+    zip -r "${zip_file}" . \
+      -x "*.git*" \
+      -x "__pycache__/*" \
+      -x "*.pyc" \
+      -x "Dockerfile" \
+      -x ".DS_Store"
+
+    echo "==> Pushing OCI artifact → ${image_tag} ..."
+    oras push \
+      --insecure \
+      "${image_tag}" \
+      "${zip_file}:application/zip"
+
+    rm -f "${zip_file}"
     echo "done:${image_tag}"
   args:
     executable: /bin/bash
-  loop: "{{ scenario_dockerfiles.files }}"
+  loop: "{{ scenario_pulumifiles.files }}"
   register: build_results
-  # async+loop 中 item.stdout 不可用，移除 changed_when，shell 預設 rc==0 即 changed
-  async: 600   # 最多等 600 秒
-  poll: 15     # 每 15 秒輸出一次進度，避免看起來「卡住」
+  async: 600
+  poll: 15
 
 - name: 顯示 build 結果
   debug:
@@ -135,7 +188,8 @@
 - name: 顯示完成資訊
   debug:
     msg:
-      - "chall-manager API: http://127.0.0.1:{{ chall_manager_port }}"
-      - "Local registry: http://{{ registry_url }}"
-      - "CTFd 外掛設定 → API URL: http://127.0.0.1:{{ chall_manager_port }}"
-      - "Scenario image 範例: {{ registry_url }}/openstack-vm:latest"
+      - "✅ chall-manager API  : http://127.0.0.1:{{ chall_manager_port }}"
+      - "✅ Local registry     : http://{{ registry_url }}"
+      - "   CTFd 外掛設定 → API URL: http://127.0.0.1:{{ chall_manager_port }}"
+      - "   CTFd 題目 Scenario : registry:{{ registry_port }}/openstack-vm:latest"
+      - "   （注意：CTFd 在 Docker network 內要用 registry:{{ registry_port }}，不是 localhost）"
