@@ -23,6 +23,11 @@ services:
       - "127.0.0.1:{{ chall_manager_port }}:8080"
     expose:
       - "8080"
+    # ✅ 做法一：OCI cache 寫入 tmpfs（RAM），容器每次重啟自動全清
+    # 根治 "remove Pulumi.hash.yaml: no such file" stale cache bug
+    # 額外好處：讀寫速度快（RAM > disk I/O）
+    tmpfs:
+      - /root/.cache/chall-manager:size=512m,mode=1777
     environment:
       # 分散式鎖後端
       CM_LOCK: etcd
