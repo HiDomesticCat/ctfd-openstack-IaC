@@ -19,6 +19,9 @@ ansible/inventory/hosts.ini
 # Ansible Vault 實際檔案
 ansible/group_vars/all/vault.yml
 
+# 環境特定設定（UUID、IP、flag 等，因環境而異，不 commit）
+ansible/group_vars/all/challenge.yml
+
 # Ansible retry 紀錄
 *.retry
 

@@ -27,18 +27,9 @@ openstack_region: "{{ vault_openstack_region | default('RegionOne') }}"
 openstack_user_domain: "{{ vault_openstack_user_domain | default('Default') }}"
 openstack_project_domain: "{{ vault_openstack_project_domain | default('Default') }}"
 
-# ── 題目（Scenario）設定 ─────────────────────────────────────
-# 這些值會透過 docker-compose 環境變數傳給 Pulumi scenario (__main__.py)
-# REPLACE_WITH_* 請填入 platform tofu apply 後取得的實際 UUID
-challenge_image_id: "REPLACE_WITH_IMAGE_UUID"       # platform 建立的 Ubuntu image UUID
-challenge_network_id: "REPLACE_WITH_NETWORK_UUID"   # CTFd 內部網路 UUID
-challenge_flavor: "general.small"
-challenge_port: "8080"
-challenge_fip_pool: "public"
-
-# 動態 flag 設定（base_flag 會依 identity 產生每人不同的 flag）
-challenge_base_flag: "replace_this_with_your_real_flag"
-challenge_flag_prefix: "CTF"
-
 # oras CLI 版本（用來推送 OCI artifact 到 local registry）
 oras_version: "1.2.0"
+
+# ── 題目（Scenario）設定 ─────────────────────────────────────
+# 這些值定義在 defaults/main.yml（優先級低，可被 group_vars 覆蓋）
+# 實際值請填入 ansible/group_vars/all/challenge.yml（已 gitignore）

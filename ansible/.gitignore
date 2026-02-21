@@ -4,5 +4,8 @@ inventory/hosts.ini
 # Ansible Vault 已加密的實際 vault 檔案
 group_vars/all/vault.yml
 
+# 環境特定設定（UUID、IP、flag 等，因環境而異，不 commit）
+group_vars/all/challenge.yml
+
 # 其他敏感資訊
 *.retry

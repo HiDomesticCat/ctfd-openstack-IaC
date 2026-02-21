@@ -1,0 +1,22 @@
+# roles/chall-manager/defaults/main.yml
+#
+# ⚑ Ansible 變數優先級說明：
+#   defaults/main.yml（最低）← 可被 group_vars 覆蓋
+#   vars/main.yml（較高）    ← 不可被 group_vars 覆蓋
+#
+# 因此「環境特定設定」放在這裡作為佔位符，
+# 真實值請填入 ansible/group_vars/all/challenge.yml（已 gitignore）
+
+# ── 題目（Scenario）設定 ─────────────────────────────────────
+# 真實值來源：
+#   platform tofu output → image_ids.ubuntu2204 (image_id)
+#   ctfd     tofu output → network_id           (network_id)
+challenge_image_id:   "REPLACE_IN_group_vars_all_challenge.yml"
+challenge_network_id: "REPLACE_IN_group_vars_all_challenge.yml"
+challenge_flavor:     "general.small"
+challenge_port:       "8080"
+challenge_fip_pool:   "public"
+
+# ── 動態 flag（不含 CTF{} wrapper）──────────────────────────
+challenge_base_flag:    "REPLACE_IN_group_vars_all_challenge.yml"
+challenge_flag_prefix:  "CTF"

@@ -1,0 +1,24 @@
+# 環境特定設定範本（複製並填入真實值）
+# 使用方式：
+#   cp challenge.yml.example challenge.yml
+#   # 然後填入 tofu output 取得的實際 UUID
+#
+# 取得方式：
+#   cd ../../platform && tofu output    → image_ids, external_network_id
+#   cd ../../ctfd    && tofu output     → network_id
+
+# ── 題目（Scenario）設定 ───────────────────────────────────────
+# platform tofu output → image_ids.ubuntu2204 or ubuntu2404
+challenge_image_id: "<IMAGE_UUID from: platform tofu output image_ids.ubuntu2204>"
+
+# ctfd tofu output → network_id
+challenge_network_id: "<NETWORK_UUID from: ctfd tofu output network_id>"
+
+challenge_flavor: "general.small"   # general.small / medium / large
+challenge_port: "8080"
+challenge_fip_pool: "public"        # platform tofu output external_network_name
+
+# ── 動態 flag ──────────────────────────────────────────────────
+# 不含括號，例如 flag 是 CTF{hello_world} 就填 hello_world
+challenge_base_flag: "<YOUR_FLAG_CONTENT_WITHOUT_CTF{}>"
+challenge_flag_prefix: "CTF"
