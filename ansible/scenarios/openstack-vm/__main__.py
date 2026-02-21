@@ -31,8 +31,11 @@ challenge_port    = int(os.environ.get("CHALLENGE_PORT", "8080"))
 base_flag         = os.environ.get("CHALLENGE_BASE_FLAG", "change_me_in_vars")
 ctf_prefix        = os.environ.get("CHALLENGE_FLAG_PREFIX", "CTF")
 
-# 資源唯一 prefix（只用 identity，避免 name 過長）
-prefix = f"ctf-{identity[:24]}"
+# 資源唯一 prefix
+# ✅ 用 MD5(identity)[:8] 取代直接截斷，避免前綴相同的 identity 產生名稱衝突
+# 例如 "user-very-long-name-1" vs "user-very-long-name-2" 前 24 字元相同
+short_id = hashlib.md5(identity.encode()).hexdigest()[:8]
+prefix = f"ctf-{short_id}"
 
 
 # ── 動態 flag（每個 identity 產生不同的 flag）────────────────
