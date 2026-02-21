@@ -4,7 +4,7 @@ chall_manager_dir: "/opt/chall-manager"
 chall_manager_port: 8080      # chall-manager API port（僅供 CTFd 內部呼叫，不對外）
 # ✅ 釘定版本，避免 latest 拉到不相容的新版本
 # 更新前請先確認 chall-manager changelog
-chall_manager_version: "v0.1.4"
+chall_manager_version: "v0.6.0"
 
 # Pulumi scenarios 目錄（存放各 challenge 的靶機定義）
 chall_manager_scenarios_dir: "/opt/chall-manager/scenarios"

@@ -16,8 +16,13 @@ services:
   chall-manager:
     image: ctferio/chall-manager:{{ chall_manager_version }}
     restart: unless-stopped
+    command:
+      - /chall-manager
+      - --oci.insecure
     ports:
       - "127.0.0.1:{{ chall_manager_port }}:8080"
+    expose:
+      - "8080"
     environment:
       # 分散式鎖後端
       CM_LOCK: etcd
@@ -60,6 +65,9 @@ services:
         condition: service_healthy
       registry:
         condition: service_started
+    networks:
+      - default
+      - ctfd_internal
 
   # ── 分散式鎖：etcd ─────────────────────────────────────────
   etcd:
@@ -84,3 +92,8 @@ volumes:
   registry-data:
   pulumi-state:
   etcd-data:
+
+networks:
+  default:
+  ctfd_internal:
+    external: true

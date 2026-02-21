@@ -1,0 +1,10 @@
+# roles/chall-manager/handlers/main.yml
+
+- name: restart chall-manager
+  community.docker.docker_compose_v2:
+    project_src: "{{ chall_manager_dir }}"
+    services:
+      - chall-manager
+    state: present
+    recreate: always
+  listen: "restart chall-manager"
