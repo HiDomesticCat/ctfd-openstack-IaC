@@ -90,7 +90,9 @@
   shell: |
     cd {{ ctfd_deploy_dir }}
     docker compose down -v 2>/dev/null || true
-    docker rmi ctfd-ctfd 2>/dev/null || true
+    docker rmi ctfd-ctfd --force 2>/dev/null || true
+    docker builder prune -af 2>/dev/null || true
+    rm -rf {{ ctfd_deploy_dir }}/.data/mysql
   when: ctfd_needs_rebuild
 
 # ── 拉取程式碼（在 build 之前）───────────────────────────
