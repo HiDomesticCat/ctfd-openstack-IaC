@@ -17,6 +17,7 @@ import (
 	"os"
 	"strconv"
 
+	"github.com/pulumi/pulumi-openstack/sdk/v4/go/openstack"
 	"github.com/pulumi/pulumi-openstack/sdk/v4/go/openstack/compute"
 	"github.com/pulumi/pulumi-openstack/sdk/v4/go/openstack/networking"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
@@ -46,6 +47,24 @@ func run(ctx *pulumi.Context) error {
 		return fmt.Errorf("invalid CHALLENGE_PORT %q: %w", challengePortStr, err)
 	}
 
+	// ── 明確配置 OpenStack provider ──────────────────────────
+	// ✅ 修復 terraform-provider-openstack v2.1.0 的 nil panic：
+	//    自動從 env vars 配置時 configureProvider 會 panic，
+	//    改為在 Go 程式中明確傳入所有必要參數。
+	osProvider, err := openstack.NewProvider(ctx, "openstack", &openstack.ProviderArgs{
+		AuthUrl:           pulumi.StringPtr(requireEnv("OS_AUTH_URL")),
+		UserName:          pulumi.StringPtr(requireEnv("OS_USERNAME")),
+		Password:          pulumi.StringPtr(requireEnv("OS_PASSWORD")),
+		TenantName:        pulumi.StringPtr(requireEnv("OS_PROJECT_NAME")),
+		UserDomainName:    pulumi.StringPtr(envOrDefault("OS_USER_DOMAIN_NAME", "Default")),
+		ProjectDomainName: pulumi.StringPtr(envOrDefault("OS_PROJECT_DOMAIN_NAME", "Default")),
+		Region:            pulumi.StringPtr(envOrDefault("OS_REGION_NAME", "RegionOne")),
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create openstack provider: %w", err)
+	}
+	prov := pulumi.Provider(osProvider)
+
 	// ── 資源唯一 prefix（MD5 hash 避免截斷衝突）──────────────
 	h := md5.Sum([]byte(identity))
 	shortID := fmt.Sprintf("%x", h)[:8]
@@ -55,7 +74,7 @@ func run(ctx *pulumi.Context) error {
 	sg, err := networking.NewSecGroup(ctx, prefix+"-sg", &networking.SecGroupArgs{
 		Name:        pulumi.String(prefix + "-sg"),
 		Description: pulumi.Sprintf("CTF sg for identity=%s", identity),
-	})
+	}, prov)
 	if err != nil {
 		return err
 	}
@@ -69,7 +88,7 @@ func run(ctx *pulumi.Context) error {
 		PortRangeMax:    pulumi.Int(challengePort),
 		RemoteIpPrefix:  pulumi.String("0.0.0.0/0"),
 		SecurityGroupId: sg.ID(),
-	}); err != nil {
+	}, prov); err != nil {
 		return err
 	}
 
@@ -80,7 +99,7 @@ func run(ctx *pulumi.Context) error {
 		Protocol:        pulumi.String("icmp"),
 		RemoteIpPrefix:  pulumi.String("0.0.0.0/0"),
 		SecurityGroupId: sg.ID(),
-	}); err != nil {
+	}, prov); err != nil {
 		return err
 	}
 
@@ -95,7 +114,7 @@ func run(ctx *pulumi.Context) error {
 				Uuid: pulumi.String(networkID),
 			},
 		},
-	}, pulumi.DependsOn([]pulumi.Resource{sg}))
+	}, prov, pulumi.DependsOn([]pulumi.Resource{sg}))
 	if err != nil {
 		return err
 	}
@@ -103,7 +122,7 @@ func run(ctx *pulumi.Context) error {
 	// ── Floating IP ──────────────────────────────────────────
 	fip, err := networking.NewFloatingIp(ctx, prefix+"-fip", &networking.FloatingIpArgs{
 		Pool: pulumi.String(fipPool),
-	}, pulumi.DependsOn([]pulumi.Resource{instance}))
+	}, prov, pulumi.DependsOn([]pulumi.Resource{instance}))
 	if err != nil {
 		return err
 	}
@@ -112,7 +131,7 @@ func run(ctx *pulumi.Context) error {
 	if _, err = compute.NewFloatingIpAssociate(ctx, prefix+"-fip-assoc", &compute.FloatingIpAssociateArgs{
 		FloatingIp: fip.Address,
 		InstanceId: instance.ID(),
-	}, pulumi.DependsOn([]pulumi.Resource{fip, instance})); err != nil {
+	}, prov, pulumi.DependsOn([]pulumi.Resource{fip, instance})); err != nil {
 		return err
 	}
 
@@ -138,7 +157,6 @@ func run(ctx *pulumi.Context) error {
 
 // variateFlag 用 HMAC-SHA256(key=baseFlag, msg=identity) 產生唯一後綴
 // 輸出純 ASCII，避免 CTFd flag 比對因 Unicode 失敗
-// 例：baseFlag="pwn_me", identity="user-001" → "pwn_me_3f2a1b4c5d6e"
 func variateFlag(identity, baseFlag string) string {
 	mac := hmac.New(sha256.New, []byte(baseFlag))
 	mac.Write([]byte(identity))
