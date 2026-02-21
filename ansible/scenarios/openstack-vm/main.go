@@ -128,8 +128,8 @@ func run(ctx *pulumi.Context) error {
 
 	// ✅ 用 networking.FloatingIpAssociate + port ID（從 instance output 讀取，非 data source）
 	// compute.FloatingIpAssociate 在 terraform-provider-openstack v1.x 不存在；
-	// instance.Networks.Index(0).Port() 是 instance 建立後的 attribute，不需要額外 API 呼叫
-	portID := instance.Networks.Index(pulumi.Int(0)).Port()
+	// Networks.Index(0).Port() 回傳 StringPtrOutput，.Elem() 轉換為 StringOutput
+	portID := instance.Networks.Index(pulumi.Int(0)).Port().Elem()
 	if _, err = networking.NewFloatingIpAssociate(ctx, prefix+"-fip-assoc", &networking.FloatingIpAssociateArgs{
 		FloatingIp: fip.Address,
 		PortId:     portID,
