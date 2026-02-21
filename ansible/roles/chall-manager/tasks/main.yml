@@ -1,12 +1,47 @@
 # roles/chall-manager/tasks/main.yml
 
-- name: 確保 python3-venv 和 zip 已安裝
+- name: 確保 zip 和 git 已安裝
   apt:
     name:
-      - python3-venv
       - zip
+      - git
     state: present
     update_cache: no
+    become: yes
+
+# ── 安裝 Go（用於編譯 scenario binary）──────────────────────
+- name: 檢查 Go 是否已安裝且版本正確
+  shell: /usr/local/go/bin/go version 2>/dev/null | grep -q "go{{ go_version }}" && echo "ok" || echo "missing"
+  args:
+    executable: /bin/bash
+  register: go_check
+  changed_when: false
+
+- name: 安裝 Go {{ go_version }}
+  block:
+    - name: 下載 Go 壓縮包
+      get_url:
+        url: "https://go.dev/dl/go{{ go_version }}.linux-amd64.tar.gz"
+        dest: "/tmp/go{{ go_version }}.linux-amd64.tar.gz"
+        mode: "0644"
+
+    - name: 移除舊版 Go（若有）
+      file:
+        path: /usr/local/go
+        state: absent
+
+    - name: 解壓 Go 到 /usr/local
+      unarchive:
+        src: "/tmp/go{{ go_version }}.linux-amd64.tar.gz"
+        dest: /usr/local/
+        remote_src: yes
+
+    - name: 清理暫存壓縮包
+      file:
+        path: "/tmp/go{{ go_version }}.linux-amd64.tar.gz"
+        state: absent
+  when: go_check.stdout != "ok"
+  become: yes
 
 # ── 允許使用 insecure local registry ─────────────────────────
 # Docker 預設不允許 HTTP registry，需要設定白名單
@@ -138,85 +173,67 @@
       - "Pulumi.yaml"
       - "Pulumi.yml"
     recurse: yes
-  register: scenario_pulumifiles
+  register: scenario_pulumi_files
 
-- name: 安裝 Python venv 並打包各 scenario 為 OCI artifact
+- name: 編譯 Go binary 並打包各 scenario 為 OCI artifact
   shell: |
     set -e
+    export PATH="/usr/local/go/bin:${PATH}"
+
     scenario_dir="{{ item.path | dirname }}"
     scenario_name="{{ item.path | dirname | basename }}"
-    zip_file="/tmp/${scenario_name}.zip"
+    image_tag="{{ registry_url }}/${scenario_name}:latest"
     state_file="/tmp/.scenario_${scenario_name}_hash"
 
-    # ── 計算 source 內容 hash（排除 venv/pyc 等非源碼檔）─────
-    src_hash=$(find "${scenario_dir}" \
-      -not -path "*/venv/*" \
-      -not -path "*/__pycache__/*" \
-      -not -name "*.pyc" \
-      -not -name "*.egg-info" \
-      -type f | sort | xargs sha256sum 2>/dev/null | sha256sum | cut -c1-12)
-
-    prev_hash=$(cat "${state_file}" 2>/dev/null || echo "")
-    versioned_tag="{{ registry_url }}/${scenario_name}:${src_hash}"
-    latest_tag="{{ registry_url }}/${scenario_name}:latest"
-
-    echo "==> Preparing Python venv for ${scenario_name} (hash=${src_hash}) ..."
+    echo "==> Building Go binary for ${scenario_name} ..."
     cd "${scenario_dir}"
 
-    if [ -f requirements.txt ]; then
-      python3 -m venv venv
-      venv/bin/pip install -q --upgrade pip
-      venv/bin/pip install -q -r requirements.txt
+    # ✅ Go runtime：編譯 binary（chall-manager 只支援 Go，不支援 Python）
+    if [ -f go.mod ]; then
+      go mod tidy
+      go mod download
+      CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o main .
+      echo "==> Go build complete"
+    else
+      echo "WARNING: no go.mod found in ${scenario_dir}, skipping build"
     fi
 
-    echo "==> Packaging ${scenario_name} as OCI artifact zip ..."
-    rm -f "${zip_file}"
-    zip -r "${zip_file}" . \
-      -x "*.git*" \
-      -x "venv/*" \
-      -x "__pycache__/*" \
-      -x "*.pyc" \
-      -x "*.egg-info/*" \
-      -x "Dockerfile" \
-      -x ".DS_Store"
+    # ── 計算 source hash（排除 compiled binary）─────────────
+    src_hash=$(find "${scenario_dir}" \
+      -not -path "*/.git/*" \
+      -not -name "main" \
+      -type f | sort | xargs sha256sum 2>/dev/null | sha256sum | cut -c1-12)
+    prev_hash=$(cat "${state_file}" 2>/dev/null || echo "")
 
-    # ── Push with content-hash tag（blobs 相同時快速完成）──────
-    echo "==> Pushing OCI artifact → ${versioned_tag} ..."
-    cd /tmp
+    # ── Push：每個檔案為獨立 layer（chall-manager 規範格式）──
+    # Minimal artifact：Pulumi.yml + main binary
+    echo "==> Pushing OCI artifact → ${image_tag} ..."
     oras push \
       --insecure \
       --disable-path-validation \
-      "${versioned_tag}" \
-      "${scenario_name}.zip:application/zip"
+      --artifact-type application/vnd.ctfer-io.scenario \
+      "${image_tag}" \
+      main:application/vnd.ctfer-io.file \
+      Pulumi.yml:application/vnd.ctfer-io.file
 
-    # ✅ 強制把 :latest 指向剛推的內容 hash tag
-    # 確保 :latest 一定是最新版本，不依賴 push 是否 skip
-    echo "==> Tagging :latest → ${versioned_tag} ..."
-    oras tag --insecure "${versioned_tag}" "latest"
-
-    rm -f "${zip_file}"
-
-    # ── 比較 hash，決定是否需要重啟 chall-manager ─────────────
+    # ── 變更偵測，決定是否重啟 chall-manager ────────────────
     if [ "${src_hash}" != "${prev_hash}" ]; then
       echo "${src_hash}" > "${state_file}"
-      echo "changed:${latest_tag}"
+      echo "changed:${image_tag}"
     else
-      echo "unchanged:${latest_tag}"
+      echo "unchanged:${image_tag}"
     fi
   args:
     executable: /bin/bash
-  loop: "{{ scenario_pulumifiles.files }}"
-  register: build_results
-  # ✅ async+loop 下 changed_when 無法可靠引用 build_results，
-  # 改為執行後用獨立 task 判斷需否 restart
-  changed_when: false   # 由下方 restart task 處理
+  loop: "{{ scenario_pulumi_files.files }}"
   async: 600
   poll: 15
+  register: scenario_build_results
 
 - name: 顯示 build 結果
   debug:
     msg: "{{ item.stdout_lines | default([]) | select('match', '^(==>|done:|changed:|unchanged:)') | list }}"
-  loop: "{{ build_results.results }}"
+  loop: "{{ scenario_build_results.results }}"
 
 # ✅ 若任一 scenario source 有變更，重啟 chall-manager 以載入新 artifact
 - name: 重啟 chall-manager（若有 scenario 更新）
@@ -227,7 +244,7 @@
     state: present
     recreate: always
   when: >-
-    build_results.results
+    scenario_build_results.results
     | selectattr('stdout', 'defined')
     | selectattr('stdout', 'search', 'changed:')
     | list | length > 0

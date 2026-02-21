@@ -3,20 +3,22 @@
 # 由 chall-manager 自動呼叫，不需要手動執行
 
 name: openstack-vm
+
+# ✅ Go runtime：chall-manager Docker image 內建 Go，直接執行編譯好的 binary
 runtime:
-  name: python
+  name: go
   options:
-    virtualenv: venv
+    binary: ./main    # Ansible task 在打包前執行 go build -o main .
 
 description: |
   CTF 靶機 Scenario：為每位玩家動態建立 OpenStack VM
-  遵循 chall-manager Scenario 規範：
+  Runtime: Go（預先編譯為 ./main binary）
+  chall-manager 規範：
     - config key : openstack-vm:identity  （chall-manager 自動注入）
-    - output key : connection_info        （回傳玩家連線資訊）
-    - output key : flag                   （動態 flag）
+    - output key : connection_info        （玩家連線資訊）
+    - output key : flag                   （動態 HMAC flag）
 
-# ✅ 正確：chall-manager 只注入 identity 這一個 config key
-# 格式為 <project-name>:identity → openstack-vm:identity
+# ✅ chall-manager 只注入 identity 這一個 config key
 config:
   openstack-vm:identity:
     description: "由 chall-manager 自動注入的玩家唯一識別"

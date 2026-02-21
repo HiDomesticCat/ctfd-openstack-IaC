@@ -12,6 +12,10 @@ override.tf.json
 *_override.tf
 *_override.tf.json
 
+# ── Go ────────────────────────────────────────────────────
+# 編譯好的 scenario binary（由 Ansible 在目標機建置，不進 git）
+ansible/scenarios/openstack-vm/main
+
 # ── Ansible ───────────────────────────────────────────────
 # 主機清單（含真實 IP 與 SSH 金鑰路徑）
 ansible/inventory/hosts.ini
