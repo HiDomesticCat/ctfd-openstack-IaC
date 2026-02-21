@@ -1,5 +1,13 @@
 # roles/chall-manager/tasks/main.yml
 
+- name: 確保 python3-venv 和 zip 已安裝
+  apt:
+    name:
+      - python3-venv
+      - zip
+    state: present
+    update_cache: no
+
 # ── 允許使用 insecure local registry ─────────────────────────
 # Docker 預設不允許 HTTP registry，需要設定白名單
 - name: 確保 /etc/docker 目錄存在
@@ -160,6 +168,7 @@
     echo "==> Pushing OCI artifact → ${image_tag} ..."
     oras push \
       --insecure \
+      --disable-path-validation \
       "${image_tag}" \
       "${zip_file}:application/zip"
 
