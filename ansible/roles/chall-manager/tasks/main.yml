@@ -7,7 +7,7 @@
       - git
     state: present
     update_cache: no
-    become: yes
+  become: yes
 
 # ── 安裝 Go（用於編譯 scenario binary）──────────────────────
 - name: 檢查 Go 是否已安裝且版本正確
@@ -41,7 +41,6 @@
         path: "/tmp/go{{ go_version }}.linux-amd64.tar.gz"
         state: absent
   when: go_check.stdout != "ok"
-  become: yes
 
 # ── 允許使用 insecure local registry ─────────────────────────
 # Docker 預設不允許 HTTP registry，需要設定白名單
