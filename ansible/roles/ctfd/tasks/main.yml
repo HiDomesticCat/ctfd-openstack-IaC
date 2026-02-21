@@ -14,7 +14,7 @@
     state: present
     update_cache: yes
 
-# ── Docker 官方倉庫（提供 docker-buildx-plugin）──────────────
+# ── Docker 官方倉庫 ────────────────────────────────────────
 - name: 建立 apt keyrings 目錄
   file:
     path: /etc/apt/keyrings
@@ -61,7 +61,7 @@
     groups: docker
     append: yes
 
-# ── CTFd 本體 ───────────────────────────────────────────────
+# ── 建立目錄 ───────────────────────────────────────────────
 - name: 建立 CTFd 部署目錄
   file:
     path: "{{ ctfd_deploy_dir }}"
@@ -70,6 +70,30 @@
     owner: ubuntu
     group: ubuntu
 
+# ── 版本感知：判斷是否需要重建 ────────────────────────────
+- name: 讀取上次部署的 CTFd 版本
+  slurp:
+    src: "{{ ctfd_deploy_dir }}/.deployed_version"
+  register: last_ctfd_version
+  ignore_errors: yes
+
+- name: 判斷是否需要重建（版本變更或首次部署）
+  set_fact:
+    ctfd_needs_rebuild: >-
+      {{
+        last_ctfd_version.failed | default(true) or
+        (last_ctfd_version.content | b64decode | trim) != (ctfd_version ~ '+' ~ ctfd_chall_manager_version)
+      }}
+
+# ── 清理舊環境（版本變更時）──────────────────────────────
+- name: 停止並清除舊容器與 volumes（版本變更時）
+  shell: |
+    cd {{ ctfd_deploy_dir }}
+    docker compose down -v 2>/dev/null || true
+    docker rmi ctfd-ctfd 2>/dev/null || true
+  when: ctfd_needs_rebuild
+
+# ── 拉取程式碼（在 build 之前）───────────────────────────
 - name: Git Clone CTFd 原始碼
   git:
     repo: "{{ ctfd_repo_url }}"
@@ -77,7 +101,7 @@
     version: "{{ ctfd_version }}"
     force: yes
 
-# ── ctfd-chall-manager 外掛 ────────────────────────────────
+# ── 安裝外掛（在 build 之前）─────────────────────────────
 - name: 確保 CTFd plugins 目錄存在
   file:
     path: "{{ ctfd_deploy_dir }}/CTFd/plugins"
@@ -90,20 +114,37 @@
     dest: "{{ ctfd_deploy_dir }}/CTFd/plugins/ctfd_chall_manager"
     version: "{{ ctfd_chall_manager_version }}"
     force: yes
-  notify: 重新啟動 CTFd
 
-# ── 清除幽靈資料夾（根本原因防禦）────────────────────────────
-# 真正的 duplicate 來源：CTFd 載入了帶連字號的幽靈資料夾
-# (ctfd-chall-manager/) 和帶底線的真正外掛 (ctfd_chall_manager/)，
-# 造成同一個 endpoint 被登記兩次。
-# 確保連字號版本不存在即可解決問題，不需要動外掛原始碼。
 - name: 確保不存在幽靈資料夾（ctfd-chall-manager，連字號版本）
   file:
     path: "{{ ctfd_deploy_dir }}/CTFd/plugins/ctfd-chall-manager"
     state: absent
 
-# ── 啟動 CTFd ──────────────────────────────────────────────
-- name: 啟動 CTFd Docker Compose
-  community.docker.docker_compose_v2:
-    project_src: "{{ ctfd_deploy_dir }}"
-    state: present
+# ── 啟動 CTFd ─────────────────────────────────────────────
+- name: 啟動 CTFd（含重 build，版本變更時）
+  shell: |
+    cd {{ ctfd_deploy_dir }}
+    docker compose up -d --build
+  when: ctfd_needs_rebuild
+
+- name: 啟動 CTFd（無版本變更，直接啟動）
+  shell: |
+    cd {{ ctfd_deploy_dir }}
+    docker compose up -d
+  when: not ctfd_needs_rebuild
+
+# ── 等待 CTFd 健康 ────────────────────────────────────────
+- name: 等待 CTFd HTTP 回應（最多 180 秒）
+  uri:
+    url: "http://127.0.0.1:8000"
+    status_code: [200, 302]
+  register: ctfd_health
+  until: ctfd_health.status in [200, 302]
+  retries: 36
+  delay: 5
+
+# ── 寫入版本記錄 ──────────────────────────────────────────
+- name: 寫入本次部署版本（ctfd + 外掛版本組合）
+  copy:
+    content: "{{ ctfd_version }}+{{ ctfd_chall_manager_version }}"
+    dest: "{{ ctfd_deploy_dir }}/.deployed_version"
