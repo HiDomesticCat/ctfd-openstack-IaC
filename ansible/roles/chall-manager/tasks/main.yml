@@ -239,14 +239,26 @@
     msg: "{{ item.stdout_lines | default([]) | select('match', '^(==>|done:|changed:|unchanged:)') | list }}"
   loop: "{{ scenario_build_results.results }}"
 
-# ✅ 做法二：偵測到 scenario 更新時，先清除 chall-manager OCI cache
-# 確保 tmpfs（做法一）萬一未啟用時 stale cache 也不會殘留
-# ignore_errors: yes 避免容器未啟動時阻斷 playbook
-- name: 清除 chall-manager OCI cache（避免 stale file 衝突）
-  command: >
-    docker exec chall-manager-chall-manager-1
-    rm -rf /root/.cache/chall-manager
-  ignore_errors: yes
+# ✅ 做法二：用 Ansible file 模組清除 bind mount 的 OCI cache 目錄
+# 比 docker exec rm 更可靠：直接操作 VM 實體目錄，不受容器狀態影響
+# 比 tmpfs 更安全：允許執行 binary（tmpfs 預設 noexec 會讓 main 執行失敗）
+- name: 清除 chall-manager OCI cache 目錄（避免 stale file）
+  file:
+    path: "{{ chall_manager_dir }}/cache"
+    state: absent
+  when: >-
+    scenario_build_results.results
+    | selectattr('stdout', 'defined')
+    | selectattr('stdout', 'search', 'changed:')
+    | list | length > 0
+
+- name: 重建乾淨的 cache 目錄（供 bind mount 使用）
+  file:
+    path: "{{ chall_manager_dir }}/cache"
+    state: directory
+    mode: "0755"
+    owner: ubuntu
+    group: ubuntu
   when: >-
     scenario_build_results.results
     | selectattr('stdout', 'defined')
@@ -254,7 +266,6 @@
     | list | length > 0
 
 # ✅ 若任一 scenario source 有變更，重啟 chall-manager 以載入新 artifact
-# （tmpfs 的 /root/.cache/chall-manager 在重啟後自動清空，double protection）
 - name: 重啟 chall-manager（若有 scenario 更新）
   community.docker.docker_compose_v2:
     project_src: "{{ chall_manager_dir }}"
