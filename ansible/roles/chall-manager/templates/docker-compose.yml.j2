@@ -65,16 +65,20 @@ services:
   etcd:
     image: {{ etcd_image }}
     restart: unless-stopped
-    environment:
-      ETCD_LISTEN_CLIENT_URLS: "http://0.0.0.0:2379"
-      ETCD_ADVERTISE_CLIENT_URLS: "http://etcd:2379"
+    # ✅ 明確指定 command，避免不同版本環境變數讀取行為不一致
+    command:
+      - etcd
+      - --data-dir=/var/lib/etcd
+      - --listen-client-urls=http://0.0.0.0:2379
+      - --advertise-client-urls=http://etcd:2379
     healthcheck:
       test: ["CMD", "etcdctl", "--endpoints=http://localhost:2379", "endpoint", "health"]
       interval: 10s
       timeout: 5s
       retries: 3
     volumes:
-      - etcd-data:/var/etcd
+      # ✅ 修正：官方 etcd image 預設資料目錄是 /var/lib/etcd，不是 /var/etcd
+      - etcd-data:/var/lib/etcd
 
 volumes:
   registry-data:

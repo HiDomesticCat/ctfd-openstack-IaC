@@ -2,7 +2,9 @@
 
 ctfd_deploy_dir: "/opt/ctfd"
 ctfd_repo_url: "https://github.com/CTFd/CTFd.git"
-ctfd_version: "master"
+# ✅ 釘定版本，避免 master 拉到不相容的 breaking change
+# 更新前請先在測試環境驗證
+ctfd_version: "v3.7.3"
 
 # ctfd-chall-manager 前端外掛
-ctfd_chall_manager_version: "main"
+ctfd_chall_manager_version: "v0.8.0"
