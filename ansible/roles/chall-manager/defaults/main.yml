@@ -20,3 +20,7 @@ challenge_fip_pool:   "public"
 # ── 動態 flag（不含 CTF{} wrapper）──────────────────────────
 challenge_base_flag:    "REPLACE_IN_group_vars_all_challenge.yml"
 challenge_flag_prefix:  "CTF"
+
+# ── Janitor 設定 ──────────────────────────────────────────
+# 多久掃描一次過期的 instance（支援 Go duration 格式：30s, 1m, 5m）
+chall_manager_janitor_ticker: "30s"

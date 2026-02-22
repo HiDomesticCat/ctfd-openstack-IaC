@@ -28,8 +28,9 @@ services:
       CM_LOCK: etcd
       CM_LOCK_ETCD_ENDPOINTS: "etcd:2379"
 
-      # Scenarios 目錄（對應到 volumes 掛載）
-      CM_DIRECTORY: /scenarios
+      # chall-manager 自己的 stack state 目錄（持久化，重啟後不消失）
+      # 注意：這不是 /scenarios（scenario 程式碼），而是 chall-manager 內部狀態
+      CM_DIRECTORY: /chall-manager-data
 
       # OpenStack 憑證（由 Pulumi scenario 程式繼承使用）
       OS_AUTH_URL: "{{ openstack_auth_url }}"
@@ -60,6 +61,8 @@ services:
       # Pulumi state 已獨立掛載到 pulumi-state volume
       - {{ chall_manager_scenarios_dir }}:/scenarios
       - pulumi-state:/pulumi-state
+      # ✅ chall-manager 自己的 stack state（持久化 volume，重啟後保留）
+      - chall-manager-data:/chall-manager-data
       # ✅ OCI cache bind mount 到 VM 實體目錄
       # 比 tmpfs 更好：允許執行（無 noexec 問題），由 Ansible file 模組清理
       - {{ chall_manager_dir }}/cache:/root/.cache/chall-manager
@@ -71,6 +74,19 @@ services:
     networks:
       - default
       - ctfd_internal
+
+  # ── 定期清理過期 instances ──────────────────────────────────
+  chall-manager-janitor:
+    image: ctferio/chall-manager-janitor:{{ chall_manager_version }}
+    restart: unless-stopped
+    command:
+      - /chall-manager-janitor
+      - --url=chall-manager:8080
+      - --ticker={{ chall_manager_janitor_ticker | default('10s') }}
+    depends_on:
+      - chall-manager
+    networks:
+      - default
 
   # ── 分散式鎖：etcd ─────────────────────────────────────────
   etcd:
@@ -94,6 +110,7 @@ services:
 volumes:
   registry-data:
   pulumi-state:
+  chall-manager-data:
   etcd-data:
 
 networks:

@@ -9,6 +9,11 @@
 // NOTE: 使用 pulumi-openstack SDK v3 (terraform-provider-openstack v1.x)
 //       SDK v4.1.0 對應的 terraform-provider-openstack v2.1.0 有 nil panic bug：
 //       panic: interface conversion: interface {} is nil @ configureProvider/getOkExists
+//
+// NOTE: FIP association 必須使用明確建立的 port（不依賴 instance.Networks 輸出）
+//       原因：pulumi-openstack v3 的 instance.Networks.Port() 回傳空值，
+//       導致 FloatingIpAssociate 以空 portId 呼叫 OpenStack API，
+//       API 接受但不實際關聯，造成 FIP 建立後仍顯示 None。
 package main
 
 import (
@@ -102,38 +107,43 @@ func run(ctx *pulumi.Context) error {
 		return err
 	}
 
-	// ── VM ───────────────────────────────────────────────────
-	instance, err := compute.NewInstance(ctx, prefix+"-vm", &compute.InstanceArgs{
-		Name:           pulumi.String(prefix),
-		ImageId:        pulumi.String(imageID),
-		FlavorName:     pulumi.String(flavorName),
-		SecurityGroups: pulumi.StringArray{sg.Name},
-		Networks: compute.InstanceNetworkArray{
-			&compute.InstanceNetworkArgs{
-				Uuid: pulumi.String(networkID),
-			},
-		},
+	// ── Port（明確建立，確保有已知 ID 可用於 FIP 關聯）────────
+	// ✅ 不從 instance.Networks 讀 port ID（pulumi-openstack v3 回傳空值）
+	// 改為先建 port，再讓 instance 和 FIP 都引用此 ID
+	port, err := networking.NewPort(ctx, prefix+"-port", &networking.PortArgs{
+		NetworkId:        pulumi.String(networkID),
+		SecurityGroupIds: pulumi.StringArray{sg.ID()},
+		AdminStateUp:     pulumi.Bool(true),
 	}, prov, pulumi.DependsOn([]pulumi.Resource{sg}))
 	if err != nil {
 		return err
 	}
 
-	// ── Floating IP ──────────────────────────────────────────
-	fip, err := networking.NewFloatingIp(ctx, prefix+"-fip", &networking.FloatingIpArgs{
-		Pool: pulumi.String(fipPool),
-	}, prov, pulumi.DependsOn([]pulumi.Resource{instance}))
+	// ── VM ───────────────────────────────────────────────────
+	// SecurityGroups 由 port 繼承，instance 本身不再設定
+	instance, err := compute.NewInstance(ctx, prefix+"-vm", &compute.InstanceArgs{
+		Name:       pulumi.String(prefix),
+		ImageId:    pulumi.String(imageID),
+		FlavorName: pulumi.String(flavorName),
+		Networks: compute.InstanceNetworkArray{
+			&compute.InstanceNetworkArgs{
+				Port: port.ID(),
+			},
+		},
+	}, prov, pulumi.DependsOn([]pulumi.Resource{port}))
 	if err != nil {
 		return err
 	}
 
-	// ✅ 用 networking.FloatingIpAssociate + port ID（從 instance output 讀取，非 data source）
-	// compute.FloatingIpAssociate 在 terraform-provider-openstack v1.x 不存在；
-	// Networks.Index(0).Port() 回傳 StringPtrOutput，.Elem() 轉換為 StringOutput
-	portID := instance.Networks.Index(pulumi.Int(0)).Port().Elem()
-	if _, err = networking.NewFloatingIpAssociate(ctx, prefix+"-fip-assoc", &networking.FloatingIpAssociateArgs{
-		FloatingIp: fip.Address,
-		PortId:     portID,
-	}, prov, pulumi.DependsOn([]pulumi.Resource{fip, instance})); err != nil {
+	// ── Floating IP（建立時直接指定 port，一步完成關聯）──────
+	// ✅ 用 PortId 取代獨立的 FloatingIpAssociate resource
+	// 原因：networking.NewFloatingIp + PortId 在 OpenStack API 層面是原子操作，
+	// 不會出現「建立成功但 association 為 None」的問題
+	fip, err := networking.NewFloatingIp(ctx, prefix+"-fip", &networking.FloatingIpArgs{
+		Pool:   pulumi.String(fipPool),
+		PortId: port.ID(),
+	}, prov, pulumi.DependsOn([]pulumi.Resource{port, instance}))
+	if err != nil {
 		return err
 	}
 

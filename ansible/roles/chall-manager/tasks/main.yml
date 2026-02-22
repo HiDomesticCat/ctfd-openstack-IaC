@@ -115,6 +115,16 @@
     owner: ubuntu
     group: ubuntu
 
+# ✅ 必須在 Docker Compose 啟動前建立，否則 Docker 會以 root 建立目錄
+# 導致容器內 chall-manager 無法寫入 OCI cache
+- name: 建立 OCI cache 目錄（供 bind mount 使用）
+  file:
+    path: "{{ chall_manager_dir }}/cache"
+    state: directory
+    mode: "0755"
+    owner: ubuntu
+    group: ubuntu
+
 # ── 同步 scenarios 原始碼到遠端 ───────────────────────────────
 - name: 同步 scenarios/ 到遠端（rsync）
   synchronize:
@@ -139,17 +149,17 @@
     group: ubuntu
   register: compose_updated
 
-- name: 啟動 chall-manager 服務（含 registry 和 etcd）
+- name: 啟動/更新 chall-manager 服務
   community.docker.docker_compose_v2:
     project_src: "{{ chall_manager_dir }}"
     state: present
-
-- name: 重啟 chall-manager（若 compose 有變更）
-  community.docker.docker_compose_v2:
-    project_src: "{{ chall_manager_dir }}"
-    state: present
-    recreate: always
-  when: compose_updated.changed
+    # ✅ recreate: auto（預設值）：Docker Compose 比對 container config hash，
+    # 只要正在跑的 container 和 compose 定義有任何差異就重建。
+    # 比 compose_updated.changed 更可靠：
+    #   - compose_updated.changed 只偵測「檔案是否有改」
+    #   - 如果手動修改過 container 或 compose 檔案曾被覆蓋再還原，Ansible 不會察覺
+    # Docker Compose 的 hash 比對是唯一可信的 source of truth
+    recreate: auto
 
 # ── 等待 registry 就緒 ─────────────────────────────────────
 - name: 等待 local registry 就緒
