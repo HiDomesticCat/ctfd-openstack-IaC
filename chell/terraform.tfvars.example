@@ -1,0 +1,42 @@
+# chell/terraform.tfvars.example
+# 複製此檔案為 terraform.tfvars 並填入實際值
+# 重要：terraform.tfvars 已加入 .gitignore，請勿手動提交
+
+# ── Provider ───────────────────────────────────────────────
+# clouds.yaml 中的 cloud entry 名稱（ctfd-deployer 帳號）
+openstack_cloud = "ctfd"
+
+# ── 從 platform 取得的值 ────────────────────────────────────
+# 執行 cd ../platform && tofu output 後複製以下兩個值
+
+# platform output: module.external_network.network_id
+external_network_id = "PASTE_FROM_PLATFORM_OUTPUT"
+
+# platform output: module.images.image_ids["ubuntu"]
+image_id = "PASTE_FROM_PLATFORM_OUTPUT"
+
+# ── SSH ────────────────────────────────────────────────────
+keypair_name    = "chell-key"
+public_key_path = "/root/.ssh/id_rsa.pub"
+
+# 建議限制為管理 IP，例如 "203.0.113.1/32"
+# ssh_allowed_cidr = "0.0.0.0/0"
+
+# ── Network ────────────────────────────────────────────────
+# 注意：不得與 ctfd 層的 192.168.100.0/24 衝突
+k3s_subnet_cidr = "192.168.200.0/24"
+master_fixed_ip = "192.168.200.10"
+
+# ── Instance ───────────────────────────────────────────────
+master_flavor    = "general.medium"
+worker_flavor    = "general.medium"
+worker_count     = 2
+floating_ip_pool = "public"
+
+# ── k3s ────────────────────────────────────────────────────
+# 產生強密碼：openssl rand -hex 32
+k3s_token = "CHANGE_ME_REPLACE_WITH_STRONG_RANDOM_TOKEN"
+
+# 建議釘定版本，例如 "v1.31.4+k3s1"
+# 留空使用最新穩定版（不建議生產環境）
+# k3s_version = "v1.31.4+k3s1"

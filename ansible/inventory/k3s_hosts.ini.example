@@ -1,0 +1,17 @@
+# ansible/inventory/k3s_hosts.ini.example
+# 此檔案由 chell/ tofu 自動產生為 k3s_hosts.ini
+# 此 example 僅供參考，實際 IP 請從 tofu output 取得
+
+[k3s_master]
+10.0.2.200 ansible_user=ubuntu ansible_ssh_private_key_file=/root/.ssh/id_rsa
+
+[k3s_workers]
+10.0.2.201 ansible_user=ubuntu ansible_ssh_private_key_file=/root/.ssh/id_rsa
+10.0.2.202 ansible_user=ubuntu ansible_ssh_private_key_file=/root/.ssh/id_rsa
+
+[k3s:children]
+k3s_master
+k3s_workers
+
+[k3s:vars]
+ansible_ssh_common_args='-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'

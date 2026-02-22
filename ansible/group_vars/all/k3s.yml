@@ -1,0 +1,28 @@
+# ansible/group_vars/all/k3s.yml
+# k3s 叢集設定（與 chell 套件相關）
+#
+# ℹ️  k3s_worker_ips 由 chell/main.tf 自動寫入
+#     group_vars/all/k3s_ids.yml，每次 tofu apply（chell 層）後更新。
+#     不需要手動維護。
+
+# ── Worker IP（玩家 challenge 連線用）────────────────────
+# ℹ️  由 chell/main.tf 自動寫入 group_vars/all/k3s_ids.yml，不在此手動維護。
+
+# ── Challenge Image 設定 ─────────────────────────────────
+# 測試用：ubuntu:22.04 + sleep,infinity 讓容器持續運行（可 SSH 進去驗證）
+# 正式 CTF：換成含 challenge 服務的 image，不設 k3s_challenge_command
+k3s_challenge_image: "ubuntu:22.04"
+k3s_challenge_command: "sleep,infinity"   # 正式 challenge image 請移除此行
+
+# ── Kubeconfig 路徑（chall-manager 容器內）────────────────
+k3s_kubeconfig_container_path: "/kubeconfig/k3s.yaml"
+
+# ── challenge namespace ───────────────────────────────────
+k3s_challenges_namespace: "challenges"
+
+# ── challenge Pod ResourceQuota ───────────────────────────
+k3s_max_challenge_pods: "50"
+k3s_challenge_cpu_request_total: "8"
+k3s_challenge_memory_request_total: "16Gi"
+k3s_challenge_cpu_limit_total: "16"
+k3s_challenge_memory_limit_total: "32Gi"

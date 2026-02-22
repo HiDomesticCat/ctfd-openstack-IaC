@@ -1,0 +1,23 @@
+# roles/k3s/defaults/main.yml
+# k3s 叢集 Ansible 設定預設值
+# 優先級最低，可透過 group_vars/all/k3s.yml 覆蓋
+
+# kubeconfig 在 CTFd 伺服器上的目錄（供 chall-manager 掛載）
+k3s_chall_manager_kubeconfig_dir: "/opt/chall-manager/kubeconfig"
+
+# challenge pod 隔離用 namespace
+k3s_challenges_namespace: "challenges"
+
+# ── challenge ResourceQuota（防止資源濫用）────────────────
+# 最大同時存在的 challenge pod 數
+k3s_max_challenge_pods: "50"
+
+# 所有 challenge pods 的 CPU/Memory 總量限制
+k3s_challenge_cpu_request_total: "8"
+k3s_challenge_memory_request_total: "16Gi"
+k3s_challenge_cpu_limit_total: "16"
+k3s_challenge_memory_limit_total: "32Gi"
+
+# ── chall-manager 目錄（需與 chall-manager role 一致）────
+# 這裡引用 chall-manager role 的 vars，若分開執行可能需要明確設定
+chall_manager_dir: "/opt/chall-manager"

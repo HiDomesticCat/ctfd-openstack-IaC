@@ -1,0 +1,110 @@
+# roles/k3s/tasks/main.yml
+# k3s 叢集驗證與 chall-manager 整合設定
+#
+# 此 role 執行於 k3s_master 主機，並透過 delegate_to 將 kubeconfig
+# 部署到 CTFd 伺服器，讓 chall-manager 可以連接 k3s API
+
+# ── 等待 k3s API 就緒 ─────────────────────────────────────
+- name: 等待 k3s API Server 可連線（最多 10 分鐘）
+  wait_for:
+    host: "{{ ansible_host }}"
+    port: 6443
+    timeout: 600
+    state: started
+
+- name: 等待所有節點進入 Ready 狀態
+  shell: |
+    NOT_READY=$(kubectl get nodes --no-headers 2>/dev/null \
+      | awk '{print $2}' | grep -v "Ready" | wc -l)
+    echo "$NOT_READY"
+  register: not_ready_count
+  retries: 24
+  delay: 15
+  until: not_ready_count.stdout | trim == "0"
+  changed_when: false
+
+- name: 顯示 k3s 叢集節點狀態
+  shell: kubectl get nodes -o wide
+  register: nodes_status
+  changed_when: false
+
+- name: 顯示節點列表
+  debug:
+    msg: "{{ nodes_status.stdout_lines }}"
+
+# ── 取得 kubeconfig ───────────────────────────────────────
+- name: 從 master 取得 kubeconfig
+  fetch:
+    src: /home/ubuntu/.kube/config
+    dest: "{{ playbook_dir }}/k3s-kubeconfig"
+    flat: yes
+  # kubeconfig 已由 cloud-init 替換為外部 floating IP
+
+# ── 在 CTFd 伺服器設定 kubeconfig ─────────────────────────
+# 讓 chall-manager Docker 容器可存取 k3s API
+- name: 在 CTFd 伺服器建立 kubeconfig 目錄
+  file:
+    path: "{{ k3s_chall_manager_kubeconfig_dir }}"
+    state: directory
+    mode: "0700"
+    owner: ubuntu
+    group: ubuntu
+  delegate_to: "{{ groups['ctfd'][0] }}"
+  run_once: true
+
+- name: 將 kubeconfig 部署到 CTFd 伺服器
+  copy:
+    src: "{{ playbook_dir }}/k3s-kubeconfig"
+    dest: "{{ k3s_chall_manager_kubeconfig_dir }}/k3s.yaml"
+    mode: "0600"
+    owner: ubuntu
+    group: ubuntu
+  delegate_to: "{{ groups['ctfd'][0] }}"
+  run_once: true
+
+# ── 建立 challenge 專用 namespace ─────────────────────────
+- name: 建立 challenges namespace（隔離 challenge pods）
+  shell: |
+    kubectl create namespace {{ k3s_challenges_namespace }} \
+      --dry-run=client -o yaml | kubectl apply -f -
+  changed_when: false
+
+- name: 為 challenges namespace 設定 ResourceQuota
+  shell: |
+    kubectl apply -f - <<'YAML'
+    apiVersion: v1
+    kind: ResourceQuota
+    metadata:
+      name: challenge-quota
+      namespace: {{ k3s_challenges_namespace }}
+    spec:
+      hard:
+        pods: "{{ k3s_max_challenge_pods }}"
+        requests.cpu: "{{ k3s_challenge_cpu_request_total }}"
+        requests.memory: "{{ k3s_challenge_memory_request_total }}"
+        limits.cpu: "{{ k3s_challenge_cpu_limit_total }}"
+        limits.memory: "{{ k3s_challenge_memory_limit_total }}"
+    YAML
+  changed_when: false
+
+# ── 確認 chall-manager 重新載入（kubeconfig 已更新）─────────
+- name: 通知 CTFd 伺服器重啟 chall-manager（讀取新 kubeconfig）
+  community.docker.docker_compose_v2:
+    project_src: "{{ chall_manager_dir }}"
+    services:
+      - chall-manager
+    state: present
+    recreate: always
+  delegate_to: "{{ groups['ctfd'][0] }}"
+  run_once: true
+
+# ── 顯示完成資訊 ───────────────────────────────────────────
+- name: 顯示完成資訊
+  debug:
+    msg:
+      - "✅ k3s 叢集已就緒"
+      - "   kubectl API     : https://{{ ansible_host }}:6443"
+      - "   kubeconfig      : {{ k3s_chall_manager_kubeconfig_dir }}/k3s.yaml（CTFd 伺服器）"
+      - "   challenges ns   : {{ k3s_challenges_namespace }}"
+      - "   chall-manager 已重啟並載入新 kubeconfig"
+  run_once: true

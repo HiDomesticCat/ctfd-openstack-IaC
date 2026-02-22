@@ -1,0 +1,13 @@
+name: k8s-pod
+description: >
+  Kubernetes Pod scenario for chell (shell) challenges.
+  為每位 CTF 玩家在 k3s 叢集動態建立獨立的 Pod 靶機，
+  透過 NodePort Service 提供 SSH 或自訂 port 連線。
+runtime:
+  name: go
+  options:
+    binary: ./main    # Ansible task 在打包前執行 go build -o main .
+config:
+  k8s-pod:identity:
+    description: 玩家 identity（由 chall-manager 自動注入，為唯一識別碼）
+    type: string

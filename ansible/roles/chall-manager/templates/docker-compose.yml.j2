@@ -42,8 +42,10 @@ services:
       OS_PROJECT_DOMAIN_NAME: "{{ openstack_project_domain }}"
       OS_IDENTITY_API_VERSION: "3"
 
-      # ── 題目設定（Pulumi __main__.py 從環境變數讀取）─────────
+      # ── 題目設定（Pulumi scenario 從環境變數讀取）─────────
       # chall-manager 容器啟動的 Pulumi 子程序會繼承以下 env vars
+
+      # openstack-vm scenario 設定
       CHALLENGE_IMAGE_ID: "{{ challenge_image_id }}"
       CHALLENGE_NETWORK_ID: "{{ challenge_network_id }}"
       CHALLENGE_FLAVOR: "{{ challenge_flavor | default('general.small') }}"
@@ -52,8 +54,24 @@ services:
       CHALLENGE_BASE_FLAG: "{{ challenge_base_flag | default('replace_me') }}"
       CHALLENGE_FLAG_PREFIX: "{{ challenge_flag_prefix | default('CTF') }}"
 
+      # k8s-pod scenario 設定（Chell Shell Challenge 後端）
+{% if k3s_worker_ips | default([]) | length > 0 %}
+      CHALLENGE_IMAGE: "{{ k3s_challenge_image | default('ubuntu:22.04') }}"
+      K3S_WORKER_IPS: "{{ k3s_worker_ips | join(',') }}"
+      KUBECONFIG: "{{ k3s_kubeconfig_container_path | default('/kubeconfig/k3s.yaml') }}"
+{% if k3s_challenge_command | default('') != '' %}
+      # 測試用：覆蓋 container 啟動指令讓容器持續運行（如 sleep,infinity）
+      # 正式 challenge image 通常不需要此設定
+      CHALLENGE_COMMAND: "{{ k3s_challenge_command }}"
+{% endif %}
+{% endif %}
+
       # Pulumi local backend（不需要 Pulumi Cloud 帳號）
       PULUMI_BACKEND_URL: "file:///pulumi-state"
+      # ⚠️  SECURITY: 空字串 passphrase 表示 pulumi-state volume 未加密。
+      # State 內含資源 UUID、floating IP 等基礎設施資訊。
+      # 建議生產/競賽環境設定強密碼以加密 state（遺失密碼將無法管理已部署資源）：
+      #   PULUMI_CONFIG_PASSPHRASE: "{{ vault_pulumi_passphrase | default('') }}"
       PULUMI_CONFIG_PASSPHRASE: ""
 
     volumes:
@@ -66,6 +84,11 @@ services:
       # ✅ OCI cache bind mount 到 VM 實體目錄
       # 比 tmpfs 更好：允許執行（無 noexec 問題），由 Ansible file 模組清理
       - {{ chall_manager_dir }}/cache:/root/.cache/chall-manager
+{% if k3s_worker_ips | default([]) | length > 0 %}
+      # k3s kubeconfig（供 k8s-pod scenario 連接 k3s API）
+      # 由 Ansible k3s role 從 master 取得並部署到此路徑
+      - {{ chall_manager_dir }}/kubeconfig/k3s.yaml:/kubeconfig/k3s.yaml:ro
+{% endif %}
     depends_on:
       etcd:
         condition: service_healthy

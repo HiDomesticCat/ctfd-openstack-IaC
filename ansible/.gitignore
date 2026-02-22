@@ -6,6 +6,10 @@ group_vars/all/vault.yml
 
 # 環境特定設定（UUID、IP、flag 等，因環境而異，不 commit）
 group_vars/all/challenge.yml
+# 由 ctfd tofu 自動產生（network_id、image_id）
+group_vars/all/challenge_ids.yml
+# 由 chell tofu 自動產生（worker IPs）
+group_vars/all/k3s_ids.yml
 
 # 其他敏感資訊
 *.retry

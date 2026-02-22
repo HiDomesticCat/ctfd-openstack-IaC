@@ -10,4 +10,17 @@
   hosts: ctfd        # 與 CTFd 同機部署；之後可獨立出去
   become: yes
   roles:
-    - chall-manager  # chall-manager 後端微服務
+    - chall-manager  # chall-manager 後端微服務（含 k3s-pod scenario 建置）
+
+# ── Chell Shell Challenge 後端（k3s 叢集）────────────────
+# 需搭配 ansible/inventory/k3s_hosts.ini（由 chell/ tofu 自動產生）
+# 執行指令：
+#   ansible-playbook site.yml \
+#     -i inventory/hosts.ini \
+#     -i inventory/k3s_hosts.ini \
+#     --ask-vault-pass
+- name: 驗證並配置 k3s 叢集（Chell Shell Challenge 後端）
+  hosts: k3s_master
+  become: yes
+  roles:
+    - k3s            # k3s 健康檢查 + kubeconfig 部署到 chall-manager

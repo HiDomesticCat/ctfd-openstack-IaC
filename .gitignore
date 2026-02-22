@@ -15,16 +15,27 @@ override.tf.json
 # ── Go ────────────────────────────────────────────────────
 # 編譯好的 scenario binary（由 Ansible 在目標機建置，不進 git）
 ansible/scenarios/openstack-vm/main
+ansible/scenarios/k8s-pod/main
 
 # ── Ansible ───────────────────────────────────────────────
-# 主機清單（含真實 IP 與 SSH 金鑰路徑）
+# 主機清單（含真實 IP 與 SSH 金鑰路徑，由 tofu apply 自動產生）
 ansible/inventory/hosts.ini
+ansible/inventory/k3s_hosts.ini
 
-# Ansible Vault 實際檔案
+# ⚠️  SECURITY CRITICAL: k3s kubeconfig
+# 由 Ansible k3s role 從 master 節點 fetch 到本機
+# 此檔案持有者可對 k3s cluster 進行任意操作，絕對不得進入版本控制
+ansible/k3s-kubeconfig
+
+# ⚠️  SECURITY: Ansible Vault 實際憑證檔案
+# 必須以 ansible-vault encrypt 加密，嚴禁以明文 commit
 ansible/group_vars/all/vault.yml
 
 # 環境特定設定（UUID、IP、flag 等，因環境而異，不 commit）
 ansible/group_vars/all/challenge.yml
+# 由 tofu apply 自動產生（含 OpenStack 資源 UUID，屬環境特定資訊）
+ansible/group_vars/all/challenge_ids.yml
+ansible/group_vars/all/k3s_ids.yml
 
 # Ansible retry 紀錄
 *.retry
@@ -33,6 +44,9 @@ ansible/group_vars/all/challenge.yml
 *.pem
 *.key
 secrets/
+# kubeconfig 萬用保護（防止任何路徑的 kubeconfig 不小心被 commit）
+*kubeconfig*
+!*kubeconfig*.example
 
 # ── 系統 / 編輯器 ─────────────────────────────────────────
 .DS_Store

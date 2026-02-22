@@ -1,12 +1,26 @@
-# ansible-vault 加密範本
-# 使用方式:
-#   cp vault.yml.example vault.yml
-#   ansible-vault encrypt vault.yml
+# ── Ansible Vault 憑證範本 ───────────────────────────────
 #
-# 之後執行 ansible-playbook 時加上:
-#   ansible-playbook site.yml --ask-vault-pass
-#   或使用 vault password file:
-#   ansible-playbook site.yml --vault-password-file ~/.vault_pass
+# ⚠️  SECURITY: 此檔案僅為範本，填入真實憑證後「必須」以 ansible-vault 加密
+# 加密前的明文 vault.yml 讓任何能讀取此目錄的人都可獲取 OpenStack 完整管理權限
+#
+# 使用流程：
+#   1. 複製並填入真實憑證：
+#        cp vault.yml.example vault.yml
+#        $EDITOR vault.yml
+#
+#   2. 加密（必要步驟，嚴禁略過）：
+#        ansible-vault encrypt vault.yml
+#
+#   3. 執行 playbook 時附上密碼：
+#        ansible-playbook site.yml --ask-vault-pass
+#        # CI/CD 環境使用密碼檔（建議 chmod 600 ~/.vault_pass）：
+#        ansible-playbook site.yml --vault-password-file ~/.vault_pass
+#
+# 安全注意事項：
+#   - vault.yml 已列入 .gitignore，但 git add -f 仍可強制加入，請勿使用
+#   - OpenStack 帳號建議使用最小權限原則（僅授予部署所需的 member 角色）
+#   - 定期輪換 OpenStack 帳號密碼並重新加密此檔案
+#   - vault password 本身建議使用隨機強密碼：openssl rand -base64 32
 
 vault_openstack_auth_url: "http://<OPENSTACK_IP>:5000/v3"
 vault_openstack_project_name: "<PROJECT_NAME>"

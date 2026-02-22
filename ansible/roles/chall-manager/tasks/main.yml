@@ -201,7 +201,7 @@
     if [ -f go.mod ]; then
       go mod tidy
       go mod download
-      CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o main .
+      CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -trimpath -o main .
       echo "==> Go build complete"
     else
       echo "WARNING: no go.mod found in ${scenario_dir}, skipping build"
@@ -299,11 +299,83 @@
     timeout: 60
     state: started
 
+# ── 預熱：預先 pull OCI artifact 至 chall-manager cache ───────
+#
+# 問題根因：chall-manager 在「第一次使用 scenario」時才從 registry
+# 執行 lazy pull。當 Ansible 清除了 OCI cache（scenario 有變更時），
+# CTFd admin 按下「創建題目」就會觸發 cold pull，造成 10~30 秒延遲。
+#
+# 解法：透過 chall-manager REST API（/api/v1/challenge）建立暫時
+# warmup challenge，強制觸發 OCI pull 並 cache，再立即刪除。
+# 下次 CTFd admin 創建題目時 artifact 已在 cache，回應幾乎即時。
+#
+# 已確認的 API 格式（由 curl 探索）：
+#   POST   http://localhost:8080/api/v1/challenge
+#   Body:  {"id":"...","scenario":"registry:5000/<name>:latest","timeout":"300s"}
+#   DELETE http://localhost:8080/api/v1/challenge/<id>
+# ─────────────────────────────────────────────────────────────
+
+- name: 預熱各 scenario（透過 REST API 觸發 OCI artifact pull + cache）
+  shell: |
+    set -e
+    PORT="{{ chall_manager_port }}"
+    SCENARIO="{{ item.path | dirname | basename }}"
+    # ✅ 用 Docker service name（registry:5000），不是 localhost:5000
+    # chall-manager 在容器內，localhost 指容器本身而非 host
+    IMAGE="{{ registry_url_internal }}/${SCENARIO}:latest"
+    WARMUP_ID="__warmup_${SCENARIO}__"
+    API_BASE="http://localhost:${PORT}/api/v1/challenge"
+
+    echo "==> [${SCENARIO}] 觸發 OCI artifact pull（${IMAGE}）..."
+
+    # 建立暫時 warmup challenge → 強制 chall-manager pull + cache OCI artifact
+    # 欄位名稱以實際 API 回應為準：id / scenario / timeout
+    CREATE_CODE=$(curl -s -o /tmp/cm_warmup_resp.json -w "%{http_code}" \
+      -X POST "${API_BASE}" \
+      -H "Content-Type: application/json" \
+      -d "{\"id\":\"${WARMUP_ID}\",\"scenario\":\"${IMAGE}\",\"timeout\":\"300s\"}" \
+      --max-time 120)
+
+    if [ "${CREATE_CODE}" = "200" ] || [ "${CREATE_CODE}" = "201" ]; then
+      echo "==> [${SCENARIO}] OCI artifact 已 cache（HTTP ${CREATE_CODE}）"
+    elif [ "${CREATE_CODE}" = "409" ]; then
+      echo "==> [${SCENARIO}] warmup challenge 已存在（cache 應已熱），繼續清除..."
+    else
+      echo "WARN: [${SCENARIO}] create warmup 回應 HTTP ${CREATE_CODE}：$(cat /tmp/cm_warmup_resp.json 2>/dev/null)"
+    fi
+
+    # 立即刪除 warmup challenge，保持 chall-manager state 乾淨
+    DELETE_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+      -X DELETE "${API_BASE}/${WARMUP_ID}" \
+      --max-time 30)
+
+    if [ "${DELETE_CODE}" = "200" ] || [ "${DELETE_CODE}" = "204" ]; then
+      echo "DONE: [${SCENARIO}] 預熱完成，CTFd 創建題目將不再有 cold-pull 延遲"
+    else
+      echo "WARN: [${SCENARIO}] delete warmup 回應 HTTP ${DELETE_CODE}（已忽略）"
+      echo "DONE: [${SCENARIO}] 預熱流程完成"
+    fi
+  args:
+    executable: /bin/bash
+  loop: "{{ scenario_pulumi_files.files }}"
+  register: warmup_results
+  changed_when: false
+  ignore_errors: yes
+
+- name: 顯示預熱結果
+  debug:
+    msg: "{{ item.stdout_lines | default([]) | select('match', '^(==>|DONE|WARN)') | list }}"
+  loop: "{{ warmup_results.results }}"
+  loop_control:
+    label: "{{ item.item.path | dirname | basename }}"
+
 - name: 顯示完成資訊
   debug:
     msg:
-      - "✅ chall-manager API  : http://127.0.0.1:{{ chall_manager_port }}"
+      - "✅ chall-manager API  : http://127.0.0.1:{{ chall_manager_port }}（host 直接存取）"
       - "✅ Local registry     : http://{{ registry_url }}"
-      - "   CTFd 外掛設定 → API URL: http://127.0.0.1:{{ chall_manager_port }}"
+      - "   ─────────────────────────────────────────────────────"
+      - "   CTFd 外掛設定 → chall-manager URL: http://chall-manager:{{ chall_manager_port }}"
+      - "   （CTFd 容器內走 ctfd_internal Docker network，用 service name 不是 localhost）"
       - "   CTFd 題目 Scenario : registry:{{ registry_port }}/openstack-vm:latest"
-      - "   （注意：CTFd 在 Docker network 內要用 registry:{{ registry_port }}，不是 localhost）"
+      - "   CTFd 題目 Scenario : registry:{{ registry_port }}/k8s-pod:latest"
