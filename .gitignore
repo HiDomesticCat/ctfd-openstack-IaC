@@ -48,6 +48,10 @@ secrets/
 *kubeconfig*
 !*kubeconfig*.example
 
+# ── Nix / direnv ─────────────────────────────────────────
+# direnv 快取（nix develop 的 symlink 樹）
+.direnv/
+
 # ── 系統 / 編輯器 ─────────────────────────────────────────
 .DS_Store
 .idea/
