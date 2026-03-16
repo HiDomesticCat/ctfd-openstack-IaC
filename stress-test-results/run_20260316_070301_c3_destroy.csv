@@ -1,0 +1,4 @@
+source_id,delete_api_ms,destroy_complete_ms,total_destroy_ms,status
+stress_1,17675,521,18196,OK
+stress_2,17821,502,18323,OK
+stress_3,18230,460,18690,OK

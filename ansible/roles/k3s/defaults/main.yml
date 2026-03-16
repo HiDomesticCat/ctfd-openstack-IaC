@@ -18,6 +18,15 @@ k3s_challenge_memory_request_total: "16Gi"
 k3s_challenge_cpu_limit_total: "16"
 k3s_challenge_memory_limit_total: "32Gi"
 
+# ── Pre-pull challenge images（加速首次啟動）─────────────
+# 列出需要預先拉取的 container image，Ansible 會在所有 k3s 節點執行 crictl pull
+# 範例：
+#   k3s_challenge_prepull_images:
+#     - "ubuntu:22.04"
+#     - "nginx:alpine"
+#     - "registry.example.com/vuln-app:v1"
+k3s_challenge_prepull_images: []
+
 # ── chall-manager 目錄（需與 chall-manager role 一致）────
 # 這裡引用 chall-manager role 的 vars，若分開執行可能需要明確設定
 chall_manager_dir: "/opt/chall-manager"

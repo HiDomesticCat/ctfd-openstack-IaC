@@ -1,0 +1,23 @@
+# web-example 題目定義
+# registration script 會合併 challenge_defaults.yml 的基礎設施預設值
+
+name: "Web Traversal"
+category: "Web"
+description: |
+  一個簡單的 Web 伺服器，你能找到隱藏的 flag 嗎？
+
+  連線方式：瀏覽器開啟題目 URL
+value: 100
+type: dynamic_iac
+state: visible
+
+# chall-manager 設定
+scenario: openstack-vm               # 會展開為 registry:5000/openstack-vm:latest
+timeout: 10                          # instance 存活秒數
+
+
+# 題目專屬設定（會覆蓋 challenge_defaults.yml 的同名 key）
+additional:
+  image_id: "ecc99d9f-1232-498c-9c69-0b786e79b4b3"
+  port: "8080"
+  base_flag: "web_traversal_2026"

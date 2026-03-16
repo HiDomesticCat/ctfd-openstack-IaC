@@ -20,7 +20,3 @@ output "router_id" {
   value       = openstack_networking_router_v2.this.id
 }
 
-output "router_interface_id" {
-  description = "Router Interface ID（instance 模組用來建立依賴關係）"
-  value       = openstack_networking_router_interface_v2.this.id
-}

@@ -1,0 +1,25 @@
+# 容器題範本（k8s-pod scenario）
+# 複製到 challenges/<your-name>/challenge.yml 後修改
+
+name: "Challenge Name"
+category: "Web"                       # Web, Pwn, Reverse, Crypto, Misc...
+description: |
+  題目描述（支援 Markdown）
+
+  連線方式：`nc <host> <port>`
+value: 500                            # 初始分數
+type: dynamic_iac
+state: hidden                         # hidden = 比賽開始前不可見
+
+# chall-manager 設定
+scenario: k8s-pod                     # 會展開為 registry:5000/k8s-pod:latest
+timeout: 3600                         # instance 存活秒數（預設無限）
+
+# 題目專屬設定
+additional:
+  image: "your-image:v1"              # Docker image（需先 push 到 registry）
+  port: "8080"                        # 服務 port
+  base_flag: "your_flag_here"         # 基礎 flag（會被 sdk.Variate 加工）
+  # command: ""                       # 選填：覆蓋 container entrypoint
+  # cpu: "200m"                       # 選填：CPU limit（覆蓋 defaults）
+  # memory: "256Mi"                   # 選填：Memory limit（覆蓋 defaults）

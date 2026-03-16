@@ -6,10 +6,11 @@
 #   1. SSH Keypair：管理用 SSH 公鑰上傳到 OpenStack
 #   2. 內部網路（192.168.100.0/24）：CTFd VM 所在的私有子網路
 #   3. Security Group：開放 SSH、HTTP、HTTPS、CTFd port（8000）
-#   4. VM + Floating IP：CTFd server 本體，具備外部可存取 IP
-#   5. Ansible 自動化（local_file）：
+#   4. Challenge Security Groups：預建的 SG（allow-all / allow-ssh / allow-web）供出題者選用
+#   5. VM + Floating IP：CTFd server 本體，具備外部可存取 IP
+#   6. Ansible 自動化（local_file）：
 #      - ansible/inventory/hosts.ini       ← CTFd VM IP + SSH key 路徑
-#      - ansible/group_vars/all/challenge_ids.yml ← network_id, image_id
+#      - ansible/group_vars/all/challenge_ids.yml ← network_id, image_id, SG IDs
 #
 # 前置：platform 層必須已 apply（需要 external_network_id, image_id）
 # 執行帳號：ctfd-deployer（clouds.yaml 的 ctfd cloud entry）
@@ -53,6 +54,15 @@ module "secgroup" {
   providers = { openstack = openstack }
 }
 
+# ── Challenge Security Groups（預建，供出題者選用）─────────
+module "challenge_secgroups" {
+  source = "./modules/challenge_secgroups"
+
+  name_prefix = "ctf"
+
+  providers = { openstack = openstack }
+}
+
 # ── VM + Floating IP ───────────────────────────────────────
 module "instance" {
   source = "./modules/instance"
@@ -79,8 +89,9 @@ module "instance" {
 # ⚠️ 靜態設定（flag、flavor、port）仍在 group_vars/all/challenge.yml 手動維護
 resource "local_file" "challenge_ids" {
   content = templatefile("${path.module}/templates/challenge_ids.tpl", {
-    network_id = module.network.network_id
-    image_id   = var.image_id
+    network_id            = module.network.network_id
+    image_id              = var.image_id
+    challenge_secgroup_ids = module.challenge_secgroups.ids
   })
   filename        = "${path.module}/../ansible/group_vars/all/challenge_ids.yml"
   file_permission = "0644"

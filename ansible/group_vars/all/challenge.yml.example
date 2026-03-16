@@ -1,24 +1,27 @@
-# 環境特定設定範本（複製並填入真實值）
-# 使用方式：
-#   cp challenge.yml.example challenge.yml
-#   # 然後填入 tofu output 取得的實際 UUID
+# 題目設定範本（1.1 改造後）
 #
-# 取得方式：
-#   cd ../../platform && tofu output    → image_ids, external_network_id
+# ⚠️  題目專屬設定（image、port、flag 等）已改為透過 CTFd Advanced 區塊的
+#     additional key-value 傳入（per-challenge），不再需要此檔案的大部分設定。
+#
+# CTFd 題目設定流程：
+#   1. 在 CTFd 建立 Dynamic Challenge
+#   2. 選擇 Scenario（如 registry:5000/openstack-vm:latest）
+#   3. 在 Advanced 區塊設定 additional key-value：
+#      openstack-vm: image_id=<UUID>, network_id=<UUID>, port=8080, base_flag=...
+#      k8s-pod:      image=vuln-app:v1, port=22, base_flag=...
+#
+# 取得 OpenStack UUID：
+#   cd ../../platform && tofu output    → image_ids
 #   cd ../../ctfd    && tofu output     → network_id
-
-# ── 題目（Scenario）設定 ───────────────────────────────────────
-# platform tofu output → image_ids.ubuntu2204 or ubuntu2404
-challenge_image_id: "<IMAGE_UUID from: platform tofu output image_ids.ubuntu2204>"
-
-# ctfd tofu output → network_id
-challenge_network_id: "<NETWORK_UUID from: ctfd tofu output network_id>"
-
-challenge_flavor: "general.small"   # general.small / medium / large
-challenge_port: "8080"
-challenge_fip_pool: "public"        # platform tofu output external_network_name
-
-# ── 動態 flag ──────────────────────────────────────────────────
-# 不含括號，例如 flag 是 CTF{hello_world} 就填 hello_world
-challenge_base_flag: "<YOUR_FLAG_CONTENT_WITHOUT_CTF{}>"
-challenge_flag_prefix: "CTF"
+#
+# ── 以下設定僅保留供相容參考，已非必要 ─────────────────────────
+# 如需全域 fallback（所有題目共用同一個值），可取消註解並在
+# docker-compose.yml.j2 中手動加回對應的 CHALLENGE_* 環境變數。
+#
+# challenge_image_id: "<IMAGE_UUID>"
+# challenge_network_id: "<NETWORK_UUID>"
+# challenge_flavor: "general.small"
+# challenge_port: "8080"
+# challenge_fip_pool: "public"
+# challenge_base_flag: "<YOUR_FLAG>"
+# challenge_flag_prefix: "CTF"

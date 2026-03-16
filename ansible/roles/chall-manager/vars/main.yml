@@ -1,7 +1,7 @@
 # roles/chall-manager/vars/main.yml
 
 # Go 版本（用於編譯 scenario binary）
-go_version: "1.22.3"
+go_version: "1.25.4"
 
 chall_manager_dir: "/opt/chall-manager"
 chall_manager_port: 8080      # chall-manager API port（僅供 CTFd 內部呼叫，不對外）

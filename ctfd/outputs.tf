@@ -24,3 +24,8 @@ output "network_id" {
   description = "CTFd 內部網路 ID"
   value       = module.network.network_id
 }
+
+output "challenge_secgroup_ids" {
+  description = "預建的 Challenge Security Group IDs（供 CTFd additional security_group_id 使用）"
+  value       = module.challenge_secgroups.ids
+}

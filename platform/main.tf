@@ -55,22 +55,24 @@ module "ctfd_project" {
   enable_quota        = true
   quota = {
     # Compute quotas
-    # 4 infra VM 用 8c/16GB；general.small = 1c/2GB/台
-    # 3 個測試帳號最多同時開 3 台題目 VM
-    instances     = 10   # 4 infra + 最多 6 台題目（保留緩衝）
-    cores         = 12   # 8 infra + 3 題目 + 1 緩衝
-    ram           = 24576 # 16384 infra + 3*2048 題目 + 2048 緩衝
+    # 基準：4 infra VM (8c/16GB) + 50 題目 VM (各 1c/2GB)
+    # 壓力測試 (2026-03-15) 驗證：並發 ~6 為 Nova spawn 上限
+    # quota 設為比賽規模上限，Nova max_concurrent_builds 控制實際並發
+    instances     = 60    # 4 infra + 50 題目 + 6 緩衝
+    cores         = 65    # 8 infra + 50 題目 + 7 緩衝
+    ram           = 122880 # 16384 infra + 50*2048 題目 + 4096 緩衝 (120GB)
     key_pairs     = 10
     server_groups = 10
 
     # Network quotas
-    floatingips          = 10   # 4 infra + 最多 6 題目，已足夠
+    # 每個題目 VM 需要：1 SG + ~4 SG rules + 1 Port + 1 FIP
+    floatingips          = 60    # 4 infra + 50 題目 + 6 緩衝
     networks             = 10
     subnets              = 10
     routers              = 5
-    ports                = 50
-    security_groups      = 15
-    security_group_rules = 150
+    ports                = 120   # 每 VM ~2 ports (internal + FIP)
+    security_groups      = 65    # 4 infra + 50 題目 + 緩衝 + default
+    security_group_rules = 500   # 每 SG ~4-6 rules
 
     # Storage quotas
     volumes   = 5

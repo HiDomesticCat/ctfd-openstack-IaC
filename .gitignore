@@ -48,6 +48,17 @@ secrets/
 *kubeconfig*
 !*kubeconfig*.example
 
+# ── Packer ───────────────────────────────────────────────
+# 認證檔案（含 OpenStack 密碼）
+packer/credentials.auto.pkrvars.hcl
+# Packer 快取（plugin binary）
+packer/.packer.d/
+packer/packer_cache/
+
+# ── CTFd API ────────────────────────────────────────────
+# 含 API Token，不可 commit
+.env
+
 # ── Nix / direnv ─────────────────────────────────────────
 # direnv 快取（nix develop 的 symlink 樹）
 .direnv/

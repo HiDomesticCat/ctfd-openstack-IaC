@@ -311,8 +311,13 @@
 #
 # 已確認的 API 格式（由 curl 探索）：
 #   POST   http://localhost:8080/api/v1/challenge
-#   Body:  {"id":"...","scenario":"registry:5000/<name>:latest","timeout":"300s"}
+#   Body:  {"id":"...","scenario":"registry:5000/<name>:latest","timeout":"300s",
+#           "additional":{"image":"vuln-app:v1","port":"8080",...}}
 #   DELETE http://localhost:8080/api/v1/challenge/<id>
+#
+# NOTE: warmup challenge 不需要 additional（只用於觸發 OCI pull）。
+# 實際題目的 additional 設定透過 CTFd plugin UI（Advanced 區塊）配置。
+# scenario 會從 req.Config.Additional 讀取 per-challenge 設定。
 # ─────────────────────────────────────────────────────────────
 
 - name: 預熱各 scenario（透過 REST API 觸發 OCI artifact pull + cache）
@@ -379,3 +384,7 @@
       - "   （CTFd 容器內走 ctfd_internal Docker network，用 service name 不是 localhost）"
       - "   CTFd 題目 Scenario : registry:{{ registry_port }}/openstack-vm:latest"
       - "   CTFd 題目 Scenario : registry:{{ registry_port }}/k8s-pod:latest"
+      - "   ─────────────────────────────────────────────────────"
+      - "   CTFd Advanced 區塊可設定 per-challenge additional key-value："
+      - "     openstack-vm: image_id, flavor, port, base_flag, flag_prefix, fip_pool"
+      - "     k8s-pod:      image, port, command, base_flag, flag_prefix, cpu/memory limits"

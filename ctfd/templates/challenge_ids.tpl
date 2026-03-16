@@ -7,3 +7,10 @@ challenge_network_id: "${network_id}"
 
 # platform tofu output → image_ids.ubuntu2204（由 ctfd 層的 var.image_id 傳入）
 challenge_image_id: "${image_id}"
+
+# ── 預建 Challenge Security Groups ──────────────────────────
+# 出題者在 CTFd Advanced 區塊設定 security_group_id=<UUID> 即可使用
+# 若不設定，scenario 會動態建立 per-player SG（較慢 ~3-5s）
+%{ for name, id in challenge_secgroup_ids ~}
+#   ${name}: ${id}
+%{ endfor ~}

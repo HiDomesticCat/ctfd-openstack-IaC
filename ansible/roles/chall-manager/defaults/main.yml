@@ -3,23 +3,23 @@
 # ⚑ Ansible 變數優先級說明：
 #   defaults/main.yml（最低）← 可被 group_vars 覆蓋
 #   vars/main.yml（較高）    ← 不可被 group_vars 覆蓋
+
+# ── 題目設定（已遷移至 CTFd additional）──────────────────────
+# 1.1 改造後，題目專屬設定（image_id、port、flavor、base_flag 等）
+# 改由 CTFd Advanced 區塊的 additional key-value 傳入（per-challenge）。
+# 不再透過 Ansible → docker-compose 環境變數傳遞。
 #
-# 因此「環境特定設定」放在這裡作為佔位符，
-# 真實值請填入 ansible/group_vars/all/challenge.yml（已 gitignore）
-
-# ── 題目（Scenario）設定 ─────────────────────────────────────
-# 真實值來源：
-#   platform tofu output → image_ids.ubuntu2204 (image_id)
-#   ctfd     tofu output → network_id           (network_id)
-challenge_image_id:   "REPLACE_IN_group_vars_all_challenge.yml"
-challenge_network_id: "REPLACE_IN_group_vars_all_challenge.yml"
-challenge_flavor:     "general.small"
-challenge_port:       "8080"
-challenge_fip_pool:   "public"
-
-# ── 動態 flag（不含 CTF{} wrapper）──────────────────────────
-challenge_base_flag:    "REPLACE_IN_group_vars_all_challenge.yml"
-challenge_flag_prefix:  "CTF"
+# 可用的 additional keys：
+#   openstack-vm:
+#     基本：  image_id, network_id, flavor, port, base_flag, flag_prefix, fip_pool
+#     加速：  security_group_id（跳過 SG 建立 ~3-5s）
+#             fip_address（使用預分配 FIP ~2-3s）
+#             flag_path（flag 檔案路徑，預設 /opt/ctf/flag.txt）
+#             cloud_init（自訂 cloud-init，支援 {{FLAG}} {{PORT}} {{IDENTITY}} 佔位符）
+#   k8s-pod:  image, port, command, base_flag, flag_prefix, cpu/memory limits
+#
+# Scenario 程式碼仍保留 CHALLENGE_* 環境變數 fallback，
+# 可在 docker-compose 手動設定作為全域預設。
 
 # ── Janitor 設定 ──────────────────────────────────────────
 # 多久掃描一次過期的 instance（支援 Go duration 格式：30s, 1m, 5m）

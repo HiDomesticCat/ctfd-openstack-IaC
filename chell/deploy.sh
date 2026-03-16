@@ -18,6 +18,14 @@ AUTO_APPROVE="${AUTO_APPROVE:-false}"
 SKIP_ANSIBLE="${SKIP_ANSIBLE:-false}"
 VAULT_PASS_FILE="${VAULT_PASS_FILE:-}"
 
+# ── 確保 ansible-playbook 可用 ──────────────────────────
+# 若 venv 存在且 ansible-playbook 不在 PATH 中，自動 activate
+KOLLA_VENV="$HOME/kolla-venv"
+if ! command -v ansible-playbook &>/dev/null && [[ -f "$KOLLA_VENV/bin/activate" ]]; then
+  # shellcheck disable=SC1091
+  source "$KOLLA_VENV/bin/activate"
+fi
+
 # ── 顏色輸出 ──────────────────────────────────────────────
 GREEN='\033[0;32m'; BLUE='\033[0;34m'; YELLOW='\033[1;33m'; NC='\033[0m'
 info()    { echo -e "${BLUE}==>${NC} $*"; }
@@ -59,23 +67,32 @@ if [[ "$SKIP_ANSIBLE" == "true" ]]; then
   exit 0
 fi
 
-# ── Step 3: 等待 master k3s API 就緒 ─────────────────────
-info "[2.5/3] 等待 k3s master API (${MASTER_IP}:6443) 就緒..."
-TIMEOUT=300
-ELAPSED=0
-until nc -z "$MASTER_IP" 6443 2>/dev/null; do
-  if [[ $ELAPSED -ge $TIMEOUT ]]; then
-    echo ""
-    warn "逾時 ${TIMEOUT}s，k3s API 尚未就緒"
-    warn "可能還在安裝中，請稍後手動重試 ansible-playbook"
-    exit 1
-  fi
-  echo -n "."
-  sleep 10
-  ELAPSED=$((ELAPSED + 10))
+# ── Step 3: 等待 VM SSH 就緒 ─────────────────────────────
+# 只等 SSH（port 22），不等 k3s API（port 6443）
+# 因為 k3s 是由 Ansible 安裝的，等 6443 會永遠卡住
+ALL_IPS=("$MASTER_IP")
+for ip in $(echo "$WORKER_IPS_JSON" | tr -d '[]"' | tr ',' ' '); do
+  ALL_IPS+=("$ip")
 done
-echo ""
-success "k3s API 已就緒（等待 ${ELAPSED}s）"
+
+TIMEOUT=180
+for ip in "${ALL_IPS[@]}"; do
+  info "[2.5/3] 等待 ${ip}:22 (SSH) 就緒..."
+  ELAPSED=0
+  until nc -z "$ip" 22 2>/dev/null; do
+    if [[ $ELAPSED -ge $TIMEOUT ]]; then
+      echo ""
+      warn "逾時 ${TIMEOUT}s，${ip} SSH 尚未就緒"
+      warn "請確認 VM 狀態後手動重試"
+      exit 1
+    fi
+    echo -n "."
+    sleep 5
+    ELAPSED=$((ELAPSED + 5))
+  done
+  echo ""
+  success "${ip} SSH 已就緒（等待 ${ELAPSED}s）"
+done
 
 # ── Step 4: ansible-playbook ──────────────────────────────
 info "[3/3] 執行 ansible-playbook..."
@@ -88,9 +105,11 @@ ANSIBLE_ARGS=(
   --extra-vars "{\"k3s_worker_ips\": ${WORKER_IPS_JSON}}"
 )
 
+# 只在有 vault 加密檔時才要求密碼
+HAS_VAULT=$(grep -rl '^\$ANSIBLE_VAULT' "$ANSIBLE_DIR" 2>/dev/null | head -1 || true)
 if [[ -n "$VAULT_PASS_FILE" ]]; then
   ANSIBLE_ARGS+=(--vault-password-file "$VAULT_PASS_FILE")
-else
+elif [[ -n "$HAS_VAULT" ]]; then
   ANSIBLE_ARGS+=(--ask-vault-pass)
 fi
 

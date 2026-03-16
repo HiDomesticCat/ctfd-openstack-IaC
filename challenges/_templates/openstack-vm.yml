@@ -1,0 +1,31 @@
+# VM 題範本（openstack-vm scenario）
+# 複製到 challenges/<your-name>/challenge.yml 後修改
+#
+# VM 題額外需要：
+#   challenges/<your-name>/packer/challenge.pkrvars.hcl  — Packer 變數
+#   challenges/<your-name>/packer/scripts/setup.sh       — 安裝腳本
+#   challenges/<your-name>/src/                          — 題目原始碼（選填）
+
+name: "Challenge Name"
+category: "Pwn"                       # Web, Pwn, Reverse, Crypto, Misc...
+description: |
+  題目描述（支援 Markdown）
+
+  連線方式：`ssh user@<host>`
+value: 500                            # 初始分數
+type: dynamic_iac
+state: hidden
+
+# chall-manager 設定
+scenario: openstack-vm                # 會展開為 registry:5000/openstack-vm:latest
+timeout: 3600                         # instance 存活秒數
+
+# 題目專屬設定（基礎設施欄位由 challenge_defaults.yml 提供）
+additional:
+  image_id: "SNAPSHOT_UUID"           # packer build 產出的 snapshot UUID
+  port: "22"                          # 服務 port
+  base_flag: "your_flag_here"         # 基礎 flag
+  # security_group_id: ""             # 選填：覆蓋預設 SG
+  # fip_address: ""                   # 選填：使用預分配 FIP
+  # flag_path: "/opt/ctf/flag.txt"    # 選填：自訂 flag 路徑
+  # cloud_init: ""                    # 選填：自訂 cloud-init 腳本
