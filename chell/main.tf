@@ -106,6 +106,8 @@ module "k3s" {
   k3s_token        = var.k3s_token
   k3s_version      = var.k3s_version
   timezone         = var.timezone
+  boot_from_volume = var.boot_from_volume
+  volume_size      = var.volume_size
 
   depends_on = [module.network, module.secgroup]
 }

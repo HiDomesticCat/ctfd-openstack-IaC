@@ -137,6 +137,20 @@ variable "floating_ip_pool" {
   }
 }
 
+# ── Volume Boot ───────────────────────────────────────────
+
+variable "boot_from_volume" {
+  description = "是否從 volume 開機（flavor disk=0 的環境必須設 true）"
+  type        = bool
+  default     = false
+}
+
+variable "volume_size" {
+  description = "k3s 節點 volume 大小（GB），boot_from_volume=true 時使用"
+  type        = number
+  default     = 20
+}
+
 # ── k3s ────────────────────────────────────────────────────
 variable "k3s_token" {
   description = "k3s cluster 預共享 Token（server 與 agent 認證用，請使用強密碼，至少 32 字元）"

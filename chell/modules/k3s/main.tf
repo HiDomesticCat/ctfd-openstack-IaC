@@ -57,9 +57,21 @@ resource "openstack_networking_port_v2" "workers" {
 # ── k3s Master Instance ───────────────────────────────────
 resource "openstack_compute_instance_v2" "master" {
   name        = var.master_name
-  image_id    = var.image_id
+  image_id    = var.boot_from_volume ? null : var.image_id
   flavor_name = var.master_flavor
   key_pair    = var.keypair_name
+
+  dynamic "block_device" {
+    for_each = var.boot_from_volume ? [1] : []
+    content {
+      uuid                  = var.image_id
+      source_type           = "image"
+      destination_type      = "volume"
+      volume_size           = var.volume_size
+      boot_index            = 0
+      delete_on_termination = true
+    }
+  }
 
   user_data = templatefile("${path.module}/cloud-init/server.yaml.tpl", {
     timezone           = var.timezone
@@ -81,9 +93,21 @@ resource "openstack_compute_instance_v2" "master" {
 resource "openstack_compute_instance_v2" "workers" {
   count       = var.worker_count
   name        = "${var.worker_name}-${count.index + 1}"
-  image_id    = var.image_id
+  image_id    = var.boot_from_volume ? null : var.image_id
   flavor_name = var.worker_flavor
   key_pair    = var.keypair_name
+
+  dynamic "block_device" {
+    for_each = var.boot_from_volume ? [1] : []
+    content {
+      uuid                  = var.image_id
+      source_type           = "image"
+      destination_type      = "volume"
+      volume_size           = var.volume_size
+      boot_index            = 0
+      delete_on_termination = true
+    }
+  }
 
   user_data = templatefile("${path.module}/cloud-init/agent.yaml.tpl", {
     timezone        = var.timezone

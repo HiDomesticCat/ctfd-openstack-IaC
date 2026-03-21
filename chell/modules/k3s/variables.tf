@@ -72,6 +72,18 @@ variable "k3s_version" {
   default     = ""
 }
 
+variable "boot_from_volume" {
+  description = "是否從 volume 開機（flavor disk=0 的環境必須設 true）"
+  type        = bool
+  default     = false
+}
+
+variable "volume_size" {
+  description = "Volume 大小（GB），boot_from_volume=true 時使用"
+  type        = number
+  default     = 20
+}
+
 variable "timezone" {
   description = "VM 時區"
   type        = string
