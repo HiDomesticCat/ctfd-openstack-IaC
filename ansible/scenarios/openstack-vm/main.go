@@ -69,6 +69,9 @@ func run(req *sdk.Request, resp *sdk.Response, opts ...pulumi.ResourceOption) er
 	}
 	flavorName := configOrEnv(req, "flavor", "CHALLENGE_FLAVOR", "general.small")
 	fipPool := configOrEnv(req, "fip_pool", "CHALLENGE_FIP_POOL", "public")
+	bootFromVolume := configOrEnv(req, "boot_from_volume", "CHALLENGE_BOOT_FROM_VOLUME", "false") == "true"
+	volumeSizeStr := configOrEnv(req, "volume_size", "CHALLENGE_VOLUME_SIZE", "10")
+	volumeSize, _ := strconv.Atoi(volumeSizeStr)
 	challengePortStr := configOrEnv(req, "port", "CHALLENGE_PORT", "8080")
 	baseFlag := configOrEnv(req, "base_flag", "CHALLENGE_BASE_FLAG", "change_me")
 	flagPrefix := configOrEnv(req, "flag_prefix", "CHALLENGE_FLAG_PREFIX", "CTF")
@@ -178,9 +181,9 @@ func run(req *sdk.Request, resp *sdk.Response, opts ...pulumi.ResourceOption) er
 	// ── VM ───────────────────────────────────────────────────
 	// VM 和 FIP 平行建立：兩者都只依賴 port，不互相依賴
 	// ConfigDrive: metadata 直接掛載為 ISO，cloud-init 不用等 DHCP 取 metadata（省 ~20s）
-	_, err = compute.NewInstance(ctx, prefix+"-vm", &compute.InstanceArgs{
+	// boot_from_volume=true: flavor disk=0 的環境必須從 volume 開機
+	instanceArgs := &compute.InstanceArgs{
 		Name:        pulumi.String(prefix),
-		ImageId:     pulumi.String(imageID),
 		FlavorName:  pulumi.String(flavorName),
 		UserData:    pulumi.String(userData),
 		ConfigDrive: pulumi.Bool(true),
@@ -189,7 +192,22 @@ func run(req *sdk.Request, resp *sdk.Response, opts ...pulumi.ResourceOption) er
 				Port: port.ID(),
 			},
 		},
-	}, withProv()...) // port.ID() 已建立隱式依賴
+	}
+	if bootFromVolume {
+		instanceArgs.BlockDevices = compute.InstanceBlockDeviceArray{
+			&compute.InstanceBlockDeviceArgs{
+				Uuid:                pulumi.String(imageID),
+				SourceType:          pulumi.String("image"),
+				DestinationType:     pulumi.String("volume"),
+				VolumeSize:          pulumi.Int(volumeSize),
+				BootIndex:           pulumi.Int(0),
+				DeleteOnTermination: pulumi.Bool(true),
+			},
+		}
+	} else {
+		instanceArgs.ImageId = pulumi.String(imageID)
+	}
+	_, err = compute.NewInstance(ctx, prefix+"-vm", instanceArgs, withProv()...)
 	if err != nil {
 		return err
 	}
