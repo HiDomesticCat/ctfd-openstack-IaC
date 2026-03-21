@@ -126,6 +126,23 @@ variable "floating_ip_pool" {
   }
 }
 
+# ── Management Network ────────────────────────────────────
+
+variable "mgmt_network_id" {
+  description = "管理網路 ID（讓 VM 能連到 OpenStack API，空字串=不接）"
+  type        = string
+  default     = ""
+}
+
+variable "mgmt_routes" {
+  description = "管理網卡的靜態路由"
+  type = list(object({
+    to  = string
+    via = string
+  }))
+  default = []
+}
+
 # ── Volume Boot ───────────────────────────────────────────
 
 variable "boot_from_volume" {

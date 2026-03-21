@@ -92,6 +92,10 @@ module "instance" {
   boot_from_volume = var.boot_from_volume
   volume_size      = var.volume_size
 
+  # 管理網路（可選，讓 VM 能連到 OpenStack API）
+  mgmt_network_id = var.mgmt_network_id
+  mgmt_routes     = var.mgmt_routes
+
   # Cloud-init 設定
   timezone   = var.timezone
   deploy_dir = var.deploy_dir
