@@ -1,8 +1,6 @@
 # ── Terraform / OpenTofu ──────────────────────────────────
 *.tfstate
 *.tfstate.*
-*.tfvars
-!*.tfvars.example
 .terraform/
 .terraform.lock.hcl
 crash.log
@@ -11,6 +9,16 @@ override.tf
 override.tf.json
 *_override.tf
 *_override.tf.json
+
+# 各層目錄內的 tfvars（舊結構，向下相容）
+platform/terraform.tfvars
+ctfd/terraform.tfvars
+chell/terraform.tfvars
+
+# ── 環境設定（environments/）──────────────────────────────
+# 只有 _template/ 進 git，其餘全部忽略
+environments/*
+!environments/_template/
 
 # ── Go ────────────────────────────────────────────────────
 # 編譯好的 scenario binary（由 Ansible 在目標機建置，不進 git）

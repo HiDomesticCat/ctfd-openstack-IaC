@@ -1,4 +1,4 @@
-# ctfd-openstack/outputs.tf
+# ctfd/outputs.tf
 
 output "floating_ip" {
   description = "CTFd 對外 Floating IP"
@@ -21,8 +21,8 @@ output "internal_ip" {
 }
 
 output "network_id" {
-  description = "CTFd 內部網路 ID"
-  value       = module.network.network_id
+  description = "CTFd 網路 ID（自建或 shared）"
+  value       = local.network_id
 }
 
 output "challenge_secgroup_ids" {

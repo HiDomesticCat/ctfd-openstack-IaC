@@ -1,0 +1,55 @@
+# environments/lab50/platform.tfvars.example
+# 複製為 platform.tfvars 後填入實際值
+
+environment    = "production"
+openstack_cloud = "openstack"
+
+# ── 外部網路：引用現有 ─────────────────────────────────────
+create_external_network        = false
+existing_external_network_name = "public3"
+
+# ── Flavor：沿用現有 ──────────────────────────────────────
+create_flavors = false
+
+# ── Image ────────────────────────────────────────────────────
+images = {
+  ubuntu2404 = {
+    name             = "Ubuntu-24.04-ctfd"
+    source_url       = "https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-amd64.img"
+    container_format = "bare"
+    disk_format      = "qcow2"
+    visibility       = "private"
+    min_disk_gb      = 10
+    min_ram_mb       = 512
+    properties = {
+      os_type    = "linux"
+      os_distro  = "ubuntu"
+      os_version = "24.04"
+    }
+  }
+}
+
+# ── Project / User ───────────────────────────────────────────
+project_name           = "ctfd-research"
+deployer_username      = "ctfd-deployer"
+ctfd_deployer_password = "<AT_LEAST_12_CHARS>"
+
+# ── Quota（依環境資源調整）──────────────────────────────────
+quota = {
+  instances            = 55
+  cores                = 60
+  ram                  = 81920
+  key_pairs            = 10
+  server_groups        = 10
+  floatingips          = 55
+  networks             = 10
+  subnets              = 10
+  routers              = 5
+  ports                = 120
+  security_groups      = 15
+  security_group_rules = 200
+  volumes              = 60
+  gigabytes            = 800
+  snapshots            = 20
+  backups              = 5
+}

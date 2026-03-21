@@ -1,0 +1,31 @@
+# OpenStack 認證設定
+# 複製到 ~/.config/openstack/clouds.yaml
+#
+# 需要兩個 cloud entry：
+#   openstack → admin 帳號（platform 層用）
+#   ctfd      → ctfd-deployer 帳號（ctfd/chell 層用，platform apply 後才存在）
+
+clouds:
+  openstack:
+    auth:
+      auth_url: http://<OPENSTACK_IP>:5000/v3
+      username: admin
+      password: "<ADMIN_PASSWORD>"
+      project_name: admin
+      user_domain_name: Default
+      project_domain_name: Default
+    region_name: RegionOne
+    interface: internal
+    identity_api_version: 3
+
+  ctfd:
+    auth:
+      auth_url: http://<OPENSTACK_IP>:5000/v3
+      username: ctfd-deployer
+      password: "<DEPLOYER_PASSWORD>"
+      project_name: <PROJECT_NAME>
+      user_domain_name: Default
+      project_domain_name: Default
+    region_name: RegionOne
+    interface: internal
+    identity_api_version: 3

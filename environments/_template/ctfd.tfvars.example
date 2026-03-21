@@ -1,0 +1,18 @@
+# environments/lab50/ctfd.tfvars.example
+# 複製為 ctfd.tfvars 後填入實際值
+
+openstack_cloud = "ctfd"
+
+# ── Shared Network 模式 ──────────────────────────────────────
+use_shared_network  = true
+shared_network_name = "shared-public3"
+
+# ── Instance ─────────────────────────────────────────────────
+image_id         = "<FROM_PLATFORM_OUTPUT>"
+flavor_name      = "basic-2c4g"
+floating_ip_pool = "public3"
+instance_name    = "ctfd-research"
+
+# ── SSH ──────────────────────────────────────────────────────
+keypair_name    = "ctfd-key"
+public_key_path = "~/.ssh/id_rsa.pub"

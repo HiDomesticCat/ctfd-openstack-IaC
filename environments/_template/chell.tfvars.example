@@ -1,0 +1,22 @@
+# environments/lab50/chell.tfvars.example
+# 複製為 chell.tfvars 後填入實際值
+
+openstack_cloud = "ctfd"
+
+# ── Shared Network 模式 ──────────────────────────────────────
+use_shared_network  = true
+shared_network_name = "shared-public3"
+
+# ── Instance ─────────────────────────────────────────────────
+image_id         = "<FROM_PLATFORM_OUTPUT>"
+master_flavor    = "basic-2c4g"
+worker_flavor    = "basic-2c4g"
+worker_count     = 2
+floating_ip_pool = "public3"
+
+# ── SSH ──────────────────────────────────────────────────────
+keypair_name    = "chell-key"
+public_key_path = "~/.ssh/id_rsa.pub"
+
+# ── k3s ──────────────────────────────────────────────────────
+k3s_token = "<GENERATE_WITH: openssl rand -hex 32>"

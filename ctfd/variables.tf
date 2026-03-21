@@ -1,4 +1,4 @@
-# ctfd-openstack/variables.tf
+# ctfd/variables.tf
 
 # ── Provider ───────────────────────────────────────────────
 variable "openstack_cloud" {
@@ -22,7 +22,7 @@ variable "keypair_name" {
 variable "public_key_path" {
   description = "SSH 公鑰絕對路徑（例如 /home/user/.ssh/id_rsa.pub）"
   type        = string
-  default     = "/home/hicat0x0/.ssh/id_rsa.pub"
+  default     = "~/.ssh/id_rsa.pub"
 
   validation {
     condition     = length(var.public_key_path) > 0
@@ -30,19 +30,30 @@ variable "public_key_path" {
   }
 }
 
-# ── Network ────────────────────────────────────────────────
-variable "external_network_id" {
-  description = "外部網路 ID（從 platform output 取得：module.external_network.network_id）"
-  type        = string
+# ── Network 開關 ─────────────────────────────────────────────
 
-  validation {
-    condition     = length(var.external_network_id) > 0
-    error_message = "external_network_id 不能為空，請從 platform output 取得。"
-  }
+variable "use_shared_network" {
+  description = "是否使用現有 shared network（true=引用 shared network，false=自建 network + router）"
+  type        = bool
+  default     = false
+}
+
+variable "shared_network_name" {
+  description = "引用的 shared network 名稱（use_shared_network=true 時必填）"
+  type        = string
+  default     = ""
+}
+
+# 以下 variable 僅在 use_shared_network=false 時使用
+
+variable "external_network_id" {
+  description = "外部網路 ID（自建網路模式，從 platform output 取得）"
+  type        = string
+  default     = ""
 }
 
 variable "internal_subnet_cidr" {
-  description = "CTFd 內部網路 CIDR（不能與其他子網路衝突）"
+  description = "CTFd 內部網路 CIDR（自建網路模式）"
   type        = string
   default     = "192.168.100.0/24"
 
@@ -89,7 +100,7 @@ variable "instance_name" {
 }
 
 variable "image_id" {
-  description = "VM 使用的 image ID（從 platform output 取得：module.images.image_ids[\"ubuntu\"]）"
+  description = "VM 使用的 image ID（從 platform output 取得）"
   type        = string
 
   validation {
@@ -99,13 +110,13 @@ variable "image_id" {
 }
 
 variable "flavor_name" {
-  description = "VM 規格名稱（從 platform 建立的 flavor 中選擇）"
+  description = "VM 規格名稱"
   type        = string
   default     = "general.medium"
 }
 
 variable "floating_ip_pool" {
-  description = "Floating IP 所在的外部網路名稱（與 platform external_network 的 network_name 一致）"
+  description = "Floating IP 所在的外部網路名稱"
   type        = string
   default     = "public"
 

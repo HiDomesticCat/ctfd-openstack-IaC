@@ -4,8 +4,10 @@
 #
 # 職責：
 #   1. SSH Keypair：k3s 節點管理用 SSH 公鑰
-#   2. 內部網路（192.168.200.0/24）：k3s 叢集節點所在的私有子網路
-#      master 固定 IP 192.168.200.10（worker cloud-init join 時需要）
+#   2. 內部網路：k3s 叢集節點所在的網路
+#      → use_shared_network = false → 自建 network + router（lab15）
+#      → use_shared_network = true  → 引用現有 shared network（lab50）
+#      master 固定 IP（worker cloud-init join 時需要）
 #   3. Security Group：
 #      - 叢集內部互通（all TCP/UDP, remote_group_id）
 #      - SSH/kubectl API 6443（限 ssh_allowed_cidr）
@@ -35,11 +37,12 @@ resource "openstack_compute_keypair_v2" "chell" {
   public_key = file(var.public_key_path)
 }
 
-# ── k3s 內部網路 ───────────────────────────────────────────
+# ── k3s 內部網路：自建 or 引用 shared ────────────────────────
+
 module "network" {
+  count  = var.use_shared_network ? 0 : 1
   source = "./modules/network"
 
-  # 明確指定 provider，避免 hashicorp/openstack 與 terraform-provider-openstack/openstack 衝突
   providers = {
     openstack = openstack
   }
@@ -51,6 +54,21 @@ module "network" {
   dns_nameservers     = var.dns_nameservers
   router_name         = "chell-router"
   external_network_id = var.external_network_id
+}
+
+data "openstack_networking_network_v2" "shared" {
+  count = var.use_shared_network ? 1 : 0
+  name  = var.shared_network_name
+}
+
+data "openstack_networking_subnet_ids_v2" "shared" {
+  count      = var.use_shared_network ? 1 : 0
+  network_id = data.openstack_networking_network_v2.shared[0].id
+}
+
+locals {
+  network_id = var.use_shared_network ? data.openstack_networking_network_v2.shared[0].id : module.network[0].network_id
+  subnet_id  = var.use_shared_network ? tolist(data.openstack_networking_subnet_ids_v2.shared[0].ids)[0] : module.network[0].subnet_id
 }
 
 # ── Security Group ─────────────────────────────────────────
@@ -81,9 +99,9 @@ module "k3s" {
   worker_count     = var.worker_count
   keypair_name     = openstack_compute_keypair_v2.chell.name
   secgroup_id      = module.secgroup.secgroup_id
-  network_id       = module.network.network_id
-  subnet_id        = module.network.subnet_id
-  master_fixed_ip  = var.master_fixed_ip
+  network_id       = local.network_id
+  subnet_id        = local.subnet_id
+  master_fixed_ip  = var.use_shared_network ? "" : var.master_fixed_ip
   floating_ip_pool = var.floating_ip_pool
   k3s_token        = var.k3s_token
   k3s_version      = var.k3s_version

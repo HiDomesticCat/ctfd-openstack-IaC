@@ -4,7 +4,9 @@
 #
 # 職責：
 #   1. SSH Keypair：管理用 SSH 公鑰上傳到 OpenStack
-#   2. 內部網路（192.168.100.0/24）：CTFd VM 所在的私有子網路
+#   2. 內部網路：CTFd VM 所在的網路
+#      → use_shared_network = false → 自建 network + router（lab15）
+#      → use_shared_network = true  → 引用現有 shared network（lab50）
 #   3. Security Group：開放 SSH、HTTP、HTTPS、CTFd port（8000）
 #   4. Challenge Security Groups：預建的 SG（allow-all / allow-ssh / allow-web）供出題者選用
 #   5. VM + Floating IP：CTFd server 本體，具備外部可存取 IP
@@ -28,8 +30,10 @@ module "keypair" {
   providers = { openstack = openstack }
 }
 
-# ── 內部網路 ──────────────────────────────────────────────
+# ── 內部網路：自建 or 引用 shared ────────────────────────────
+
 module "network" {
+  count  = var.use_shared_network ? 0 : 1
   source = "./modules/network"
 
   network_name        = "ctfd-network"
@@ -40,6 +44,15 @@ module "network" {
   external_network_id = var.external_network_id
 
   providers = { openstack = openstack }
+}
+
+data "openstack_networking_network_v2" "shared" {
+  count = var.use_shared_network ? 1 : 0
+  name  = var.shared_network_name
+}
+
+locals {
+  network_id = var.use_shared_network ? data.openstack_networking_network_v2.shared[0].id : module.network[0].network_id
 }
 
 # ── Security Group ─────────────────────────────────────────
@@ -72,14 +85,14 @@ module "instance" {
   flavor_name      = var.flavor_name
   keypair_name     = module.keypair.keypair_name
   secgroup_name    = module.secgroup.secgroup_name
-  network_id       = module.network.network_id
+  network_id       = local.network_id
   floating_ip_pool = var.floating_ip_pool
 
   # Cloud-init 設定
   timezone   = var.timezone
   deploy_dir = var.deploy_dir
 
-  # 確保網路和 Router Interface 完全就緒後才建立 VM
+  # 自建模式需等 network + router 完全就緒；shared 模式不需要
   depends_on = [module.network]
 
   providers = { openstack = openstack }
@@ -89,7 +102,7 @@ module "instance" {
 # ⚠️ 靜態設定（flag、flavor、port）仍在 group_vars/all/challenge.yml 手動維護
 resource "local_file" "challenge_ids" {
   content = templatefile("${path.module}/templates/challenge_ids.tpl", {
-    network_id            = module.network.network_id
+    network_id            = local.network_id
     image_id              = var.image_id
     challenge_secgroup_ids = module.challenge_secgroups.ids
   })

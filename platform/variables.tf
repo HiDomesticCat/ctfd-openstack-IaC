@@ -1,5 +1,7 @@
 # platform/variables.tf
 
+# ── 環境 ─────────────────────────────────────────────────────
+
 variable "environment" {
   description = "環境名稱（dev, staging, production）"
   type        = string
@@ -17,8 +19,55 @@ variable "openstack_cloud" {
   default     = "openstack"
 }
 
+# ── Project / User ──────────────────────────────────────────
+
+variable "project_name" {
+  description = "OpenStack project 名稱"
+  type        = string
+  default     = "ctfd"
+}
+
+variable "project_description" {
+  description = "OpenStack project 描述"
+  type        = string
+  default     = "CTFd 競賽平台環境"
+}
+
+variable "deployer_username" {
+  description = "部署帳號名稱"
+  type        = string
+  default     = "ctfd-deployer"
+}
+
+variable "ctfd_deployer_password" {
+  description = "CTFd 部署帳號的密碼"
+  type        = string
+  sensitive   = true
+
+  validation {
+    condition     = length(var.ctfd_deployer_password) >= 12
+    error_message = "密碼長度至少 12 個字元。"
+  }
+}
+
+# ── 外部網路開關 ─────────────────────────────────────────────
+
+variable "create_external_network" {
+  description = "是否自建外部網路（true=自建，false=引用已有的 external network）"
+  type        = bool
+  default     = true
+}
+
+variable "existing_external_network_name" {
+  description = "引用現有外部網路的名稱（create_external_network=false 時必填）"
+  type        = string
+  default     = ""
+}
+
+# 以下 variable 僅在 create_external_network=true 時使用
+
 variable "external_subnet_cidr" {
-  description = "外部網路 CIDR"
+  description = "外部網路 CIDR（自建模式）"
   type        = string
   default     = "10.0.2.0/24"
 
@@ -29,19 +78,19 @@ variable "external_subnet_cidr" {
 }
 
 variable "external_gateway_ip" {
-  description = "外部網路 Gateway，對應 PVE vmbr1"
+  description = "外部網路 Gateway（自建模式）"
   type        = string
   default     = "10.0.2.1"
 }
 
 variable "external_pool_start" {
-  description = "Floating IP 池起始 IP"
+  description = "Floating IP 池起始 IP（自建模式）"
   type        = string
   default     = "10.0.2.150"
 }
 
 variable "external_pool_end" {
-  description = "Floating IP 池結束 IP"
+  description = "Floating IP 池結束 IP（自建模式）"
   type        = string
   default     = "10.0.2.199"
 }
@@ -53,16 +102,38 @@ variable "dns_nameservers" {
 }
 
 variable "physical_network" {
-  description = "實體網路名稱"
+  description = "實體網路名稱（自建模式）"
   type        = string
   default     = "physnet1"
 }
 
 variable "network_type" {
-  description = "外部網路類型"
+  description = "外部網路類型（自建模式）"
   type        = string
   default     = "flat"
 }
+
+# ── Flavor 開關 ──────────────────────────────────────────────
+
+variable "create_flavors" {
+  description = "是否自建 flavor（true=自建，false=沿用環境現有 flavor）"
+  type        = bool
+  default     = true
+}
+
+variable "flavors" {
+  description = "要建立的 flavor 定義（create_flavors=true 時使用）"
+  type = map(object({
+    name      = string
+    ram       = number
+    vcpus     = number
+    disk      = number
+    is_public = bool
+  }))
+  default = {}
+}
+
+# ── Image ────────────────────────────────────────────────────
 
 variable "images" {
   description = "要上傳到 OpenStack 的 image 定義"
@@ -78,24 +149,44 @@ variable "images" {
   }))
 }
 
-variable "flavors" {
-  description = "要建立的 flavor 定義"
-  type = map(object({
-    name      = string
-    ram       = number
-    vcpus     = number
-    disk      = number
-    is_public = bool
-  }))
-}
+# ── Quota ────────────────────────────────────────────────────
 
-variable "ctfd_deployer_password" {
-  description = "CTFd 部署帳號的密碼"
-  type        = string
-  sensitive   = true
-
-  validation {
-    condition     = length(var.ctfd_deployer_password) >= 12
-    error_message = "密碼長度至少 12 個字元。"
+variable "quota" {
+  description = "Project 配額設定"
+  type = object({
+    instances            = number
+    cores                = number
+    ram                  = number
+    key_pairs            = number
+    server_groups        = number
+    floatingips          = number
+    networks             = number
+    subnets              = number
+    routers              = number
+    ports                = number
+    security_groups      = number
+    security_group_rules = number
+    volumes              = number
+    gigabytes            = number
+    snapshots            = number
+    backups              = number
+  })
+  default = {
+    instances            = 60
+    cores                = 65
+    ram                  = 122880
+    key_pairs            = 10
+    server_groups        = 10
+    floatingips          = 60
+    networks             = 10
+    subnets              = 10
+    routers              = 5
+    ports                = 120
+    security_groups      = 65
+    security_group_rules = 500
+    volumes              = 5
+    gigabytes            = 500
+    snapshots            = 10
+    backups              = 5
   }
 }

@@ -1,0 +1,13 @@
+# Packer 環境設定
+# 複製到 environments/<env>/packer.pkrvars.hcl 後填入實際值
+
+openstack_auth_url     = "http://<OPENSTACK_IP>:5000/v3"
+openstack_username     = "ctfd-deployer"
+openstack_password     = "<PASSWORD>"
+openstack_project_name = "<PROJECT_NAME>"
+
+source_image_id  = "<FROM_PLATFORM_OUTPUT>"
+network_id       = "<FROM_CTFD_OUTPUT>"
+flavor           = "general.small"
+floating_ip_pool = "public"
+security_groups  = ["ctf-allow-web"]

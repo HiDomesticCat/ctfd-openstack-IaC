@@ -4,7 +4,14 @@
 # 設計重點：
 # 1. master floating IP 先行分配，用於 cloud-init TLS SAN → kubeconfig 直接包含外部 IP
 # 2. worker floating IP 先行分配，玩家透過 NodePort 連接 challenge
-# 3. master 使用 port 資源設定固定 IP，確保 worker 可用固定 IP join cluster
+# 3. 自建網路模式：master 使用 port 資源設定固定 IP，確保 worker 可用固定 IP join cluster
+# 4. Shared 網路模式：master 使用 DHCP IP，worker 透過 master FIP join cluster
+
+locals {
+  use_fixed_ip    = var.master_fixed_ip != ""
+  # Worker join 用的 master IP：有固定 IP 就用固定 IP，沒有就用 FIP
+  master_join_ip = local.use_fixed_ip ? var.master_fixed_ip : openstack_networking_floatingip_v2.master.address
+}
 
 # ── 預先分配 Floating IPs ──────────────────────────────────
 # 分配在 instance 建立前，使 cloud-init 可以直接使用這些 IP
@@ -17,8 +24,10 @@ resource "openstack_networking_floatingip_v2" "workers" {
   pool  = var.floating_ip_pool
 }
 
-# ── Master Port（固定 IP）────────────────────────────────
-# 固定 IP 使 worker cloud-init 不需等 DHCP 即可知道 master 的 IP
+# ── Master Port ─────────────────────────────────────────────
+# 自建網路模式：固定 IP（worker cloud-init 不需等 DHCP 即可知道 master IP）
+# Shared 網路模式：DHCP 分配（worker 改用 master FIP join）
+
 resource "openstack_networking_port_v2" "master" {
   name           = "${var.master_name}-port"
   network_id     = var.network_id
@@ -26,9 +35,12 @@ resource "openstack_networking_port_v2" "master" {
 
   security_group_ids = [var.secgroup_id]
 
-  fixed_ip {
-    subnet_id  = var.subnet_id
-    ip_address = var.master_fixed_ip
+  dynamic "fixed_ip" {
+    for_each = local.use_fixed_ip ? [1] : []
+    content {
+      subnet_id  = var.subnet_id
+      ip_address = var.master_fixed_ip
+    }
   }
 }
 
@@ -53,7 +65,7 @@ resource "openstack_compute_instance_v2" "master" {
     timezone           = var.timezone
     k3s_token          = var.k3s_token
     k3s_version        = var.k3s_version
-    master_fixed_ip    = var.master_fixed_ip
+    master_fixed_ip    = local.use_fixed_ip ? var.master_fixed_ip : "0.0.0.0"
     master_floating_ip = openstack_networking_floatingip_v2.master.address
   })
 
@@ -77,7 +89,7 @@ resource "openstack_compute_instance_v2" "workers" {
     timezone        = var.timezone
     k3s_token       = var.k3s_token
     k3s_version     = var.k3s_version
-    master_fixed_ip = var.master_fixed_ip
+    master_fixed_ip = local.master_join_ip
   })
 
   network {
