@@ -88,6 +88,10 @@ module "instance" {
   network_id       = local.network_id
   floating_ip_pool = var.floating_ip_pool
 
+  # Volume boot（flavor disk=0 的環境必須設 true）
+  boot_from_volume = var.boot_from_volume
+  volume_size      = var.volume_size
+
   # Cloud-init 設定
   timezone   = var.timezone
   deploy_dir = var.deploy_dir

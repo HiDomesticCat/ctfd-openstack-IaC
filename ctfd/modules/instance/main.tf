@@ -1,9 +1,11 @@
 # ctfd-openstack/modules/instance/main.tf
 
 # CTFd VM
+# boot_from_volume=false → image_id 直接 boot（flavor disk>0）
+# boot_from_volume=true  → image → volume → boot（flavor disk=0）
 resource "openstack_compute_instance_v2" "this" {
   name        = var.instance_name
-  image_id    = var.image_id
+  image_id    = var.boot_from_volume ? null : var.image_id
   flavor_name = var.flavor_name
   key_pair    = var.keypair_name
 
@@ -11,6 +13,18 @@ resource "openstack_compute_instance_v2" "this" {
 
   network {
     uuid = var.network_id
+  }
+
+  dynamic "block_device" {
+    for_each = var.boot_from_volume ? [1] : []
+    content {
+      uuid                  = var.image_id
+      source_type           = "image"
+      destination_type      = "volume"
+      volume_size           = var.volume_size
+      boot_index            = 0
+      delete_on_termination = true
+    }
   }
 
   # Cloud-init：VM 第一次啟動時自動執行
