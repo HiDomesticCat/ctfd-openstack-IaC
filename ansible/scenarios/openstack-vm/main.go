@@ -20,6 +20,8 @@
 //   fip_address       預分配的 Floating IP 位址（跳過 FIP 建立，省 ~2-3s）
 //   connection_info   連線資訊模板（支援 {ip} {port} 佔位符，預設 "nc {ip} {port}"）
 //                     範例："http://{ip}:{port}" / "ssh ubuntu@{ip}" / "nc {ip} {port}"
+//   readiness_timeout 等待服務就緒的超時時間（預設 "0" 跳過檢查，最快啟動）
+//                     範例："0"（跳過）/ "30s"（等最多 30 秒）/ "120s"（原始行為）
 //
 // 啟動加速策略：
 //   1. Packer snapshot：出題者用 Packer 預先 bake 題目 image，VM 直接開機即可用
@@ -84,6 +86,15 @@ func run(req *sdk.Request, resp *sdk.Response, opts ...pulumi.ResourceOption) er
 	customCloudInit := configOrEnv(req, "cloud_init", "", "")
 	fipAddress := configOrEnv(req, "fip_address", "", "")
 	connTpl := configOrEnv(req, "connection_info", "", "nc {ip} {port}")
+	readinessTimeoutStr := configOrEnv(req, "readiness_timeout", "CHALLENGE_READINESS_TIMEOUT", "0")
+
+	// 解析 readiness_timeout：支援 "0"（跳過）/ "30s" / "120"（秒數）
+	var readinessTimeout time.Duration
+	if d, derr := time.ParseDuration(readinessTimeoutStr); derr == nil {
+		readinessTimeout = d
+	} else if secs, serr := strconv.Atoi(readinessTimeoutStr); serr == nil {
+		readinessTimeout = time.Duration(secs) * time.Second
+	}
 
 	challengePort, err := strconv.Atoi(challengePortStr)
 	if err != nil {
@@ -191,6 +202,7 @@ func run(req *sdk.Request, resp *sdk.Response, opts ...pulumi.ResourceOption) er
 		FlavorName:  pulumi.String(flavorName),
 		UserData:    pulumi.String(userData),
 		ConfigDrive: pulumi.Bool(true),
+		ForceDelete: pulumi.Bool(true), // 加速 destroy：跳過 graceful shutdown
 		Networks: compute.InstanceNetworkArray{
 			&compute.InstanceNetworkArgs{
 				Port: port.ID(),
@@ -253,10 +265,13 @@ func run(req *sdk.Request, resp *sdk.Response, opts ...pulumi.ResourceOption) er
 		}).(pulumi.StringOutput)
 	}
 
-	// ── Readiness Check ─────────────────────────────────────
-	// 等待 VM 上的 challenge service 真正就緒（TCP port 可連）
+	// ── Readiness Check（可配置）─────────────────────────────
+	// readiness_timeout=0（預設）：跳過檢查，立即回傳（最快啟動，搭配 Pooler 使用）
+	// readiness_timeout>0：等待 TCP port 就緒（保守模式）
 	resp.ConnectionInfo = connAddr.ApplyT(func(ip string) string {
-		waitForPort(ip, challengePort, 120*time.Second)
+		if readinessTimeout > 0 {
+			waitForPort(ip, challengePort, readinessTimeout)
+		}
 		return formatConnectionInfo(connTpl, ip, challengePort)
 	}).(pulumi.StringOutput)
 	ctx.Export("ssh_command", connAddr.ApplyT(func(ip string) string {
@@ -335,12 +350,12 @@ func waitForPort(host string, port int, timeout time.Duration) {
 	addr := fmt.Sprintf("%s:%d", host, port)
 	deadline := time.Now().Add(timeout)
 	for time.Now().Before(deadline) {
-		conn, err := net.DialTimeout("tcp", addr, 3*time.Second)
+		conn, err := net.DialTimeout("tcp", addr, 2*time.Second)
 		if err == nil {
 			conn.Close()
 			return
 		}
-		time.Sleep(2 * time.Second)
+		time.Sleep(1 * time.Second)
 	}
 	// timeout 不 fail deployment，只是 log warning
 	fmt.Printf("WARNING: readiness check timed out for %s (waited %s)\n", addr, timeout)

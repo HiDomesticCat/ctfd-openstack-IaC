@@ -16,11 +16,12 @@
 //   cpu_limit      CPU limit（預設 500m）
 //   memory_request Memory request（預設 128Mi）
 //   memory_limit   Memory limit（預設 512Mi）
-//   connection_info 連線資訊模板（支援 {ip} {port} 佔位符，預設 "nc {ip} {port}"）
-//                   範例："http://{ip}:{port}" / "ssh ctf@{ip} -p {port}"
+//   connection_info       連線資訊模板（支援 {ip} {port} 佔位符，預設 "nc {ip} {port}"）
+//   use_shared_namespace  使用共用 namespace（預設 "true"，省一次 K8s API call，加速 boot + destroy）
+//   shared_namespace      共用 namespace 名稱（預設 "challenges"，由 Ansible k3s role 預建）
 //
 // 建立的 Kubernetes 資源（每位玩家一組，以 shortID 隔離）：
-//   - Namespace  ctf-<shortID>          （玩家隔離邊界）
+//   - Namespace  challenges（共用）或 ctf-<shortID>（獨立，use_shared_namespace=false）
 //   - Pod        ctf-<shortID>          （靶機本體，resource limited）
 //   - Service    ctf-<shortID>-svc      （NodePort，玩家連線入口）
 package main
@@ -87,34 +88,45 @@ func main() {
 		workerIPs := strings.Split(rawWorkerIPs, ",")
 		workerIP := strings.TrimSpace(workerIPs[0])
 
+		// ── 共用 Namespace 設定 ─────────────────────────────
+		useSharedNS := configOrEnv(req, "use_shared_namespace", "", "true") == "true"
+		sharedNSName := configOrEnv(req, "shared_namespace", "", "challenges")
+
 		// ── Kubernetes 資源名稱 ────────────────────────────
-		nsName := fmt.Sprintf("ctf-%s", sid)
 		podName := fmt.Sprintf("ctf-%s", sid)
 		svcName := fmt.Sprintf("ctf-%s-svc", sid)
 
-		// ── Namespace（每位玩家獨立）──────────────────────
-		ns, err := corev1.NewNamespace(ctx, "ns", &corev1.NamespaceArgs{
-			Metadata: &metav1.ObjectMetaArgs{
-				Name: pulumi.String(nsName),
-				Labels: pulumi.StringMap{
-					"managed-by":   pulumi.String("chall-manager"),
-					"ctf-id":       pulumi.String(sid),
-					"ctf-scenario": pulumi.String("k8s-pod"),
+		// ── Namespace ────────────────────────────────────
+		// 共用模式（預設）：用 Ansible 預建的 challenges namespace，省一次 K8s API call
+		// 獨立模式：每位玩家建專屬 namespace（較慢但隔離更強）
+		var namespaceName pulumi.StringOutput
+		if useSharedNS {
+			namespaceName = pulumi.String(sharedNSName).ToStringOutput()
+		} else {
+			nsName := fmt.Sprintf("ctf-%s", sid)
+			ns, err := corev1.NewNamespace(ctx, "ns", &corev1.NamespaceArgs{
+				Metadata: &metav1.ObjectMetaArgs{
+					Name: pulumi.String(nsName),
+					Labels: pulumi.StringMap{
+						"managed-by":   pulumi.String("chall-manager"),
+						"ctf-id":       pulumi.String(sid),
+						"ctf-scenario": pulumi.String("k8s-pod"),
+					},
+					Annotations: pulumi.StringMap{
+						"pulumi.com/skipAwait": pulumi.String("true"),
+					},
 				},
-				// ✅ skipAwait：destroy 時不等 namespace 內所有資源清空
-				Annotations: pulumi.StringMap{
-					"pulumi.com/skipAwait": pulumi.String("true"),
-				},
-			},
-		}, opts...)
-		if err != nil {
-			return fmt.Errorf("create namespace: %w", err)
+			}, opts...)
+			if err != nil {
+				return fmt.Errorf("create namespace: %w", err)
+			}
+			namespaceName = namespaceName.Elem()
 		}
 
 		// ── Challenge Pod ──────────────────────────────────
 		_, err = corev1.NewPod(ctx, "pod", &corev1.PodArgs{
 			Metadata: &metav1.ObjectMetaArgs{
-				Namespace: ns.Metadata.Name(),
+				Namespace: namespaceName,
 				Name:      pulumi.String(podName),
 				Labels: pulumi.StringMap{
 					"app":          pulumi.String("ctf-challenge"),
@@ -173,7 +185,7 @@ func main() {
 		// ── NodePort Service（玩家連線入口）──────────────
 		svc, err := corev1.NewService(ctx, "svc", &corev1.ServiceArgs{
 			Metadata: &metav1.ObjectMetaArgs{
-				Namespace: ns.Metadata.Name(),
+				Namespace: namespaceName,
 				Name:      pulumi.String(svcName),
 				Annotations: pulumi.StringMap{
 					"pulumi.com/skipAwait": pulumi.String("true"),

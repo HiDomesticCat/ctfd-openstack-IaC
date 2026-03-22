@@ -28,6 +28,7 @@ additional:
   port: "22"                          # 服務 port
   base_flag: "your_flag_here"         # 基礎 flag
   # connection_info: "ssh ubuntu@{ip}" # 選填：連線資訊模板（{ip} {port} 佔位符）
+  # readiness_timeout: "0"            # 選填：就緒檢查超時（"0"=跳過最快，"30s"=等待）
   # security_group_id: ""             # 選填：覆蓋預設 SG
   # fip_address: ""                   # 選填：使用預分配 FIP
   # flag_path: "/opt/ctf/flag.txt"    # 選填：自訂 flag 路徑

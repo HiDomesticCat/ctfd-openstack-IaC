@@ -22,6 +22,7 @@ additional:
   port: "8080"                        # 服務 port
   base_flag: "your_flag_here"         # 基礎 flag（會被 sdk.Variate 加工）
   # connection_info: "http://{ip}:{port}" # 選填：連線資訊模板（{ip} {port} 佔位符）
+  # use_shared_namespace: "true"      # 選填：使用共用 namespace（加速 boot + destroy）
   # command: ""                       # 選填：覆蓋 container entrypoint
   # cpu: "200m"                       # 選填：CPU limit（覆蓋 defaults）
   # memory: "256Mi"                   # 選填：Memory limit（覆蓋 defaults）
