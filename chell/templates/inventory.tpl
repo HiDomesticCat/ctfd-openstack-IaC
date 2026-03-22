@@ -15,5 +15,9 @@ k3s_master
 k3s_workers
 
 [k3s:vars]
+%{ if bastion_ip != "" ~}
+ansible_ssh_common_args='-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ProxyJump=ubuntu@${bastion_ip}'
+%{ else ~}
 ansible_ssh_common_args='-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'
+%{ endif ~}
 ansible_python_interpreter=/usr/bin/python3

@@ -137,6 +137,22 @@ variable "floating_ip_pool" {
   }
 }
 
+# ── Bastion ───────────────────────────────────────────────
+
+variable "bastion_ip" {
+  description = "Bastion/Jump host IP（use_fip=false 時，Ansible 透過此 IP 跳板 SSH）"
+  type        = string
+  default     = ""
+}
+
+# ── FIP 開關 ──────────────────────────────────────────────
+
+variable "use_fip" {
+  description = "是否建立 Floating IP（false=用內網 IP，透過 bastion 管理）"
+  type        = bool
+  default     = true
+}
+
 # ── Volume Boot ───────────────────────────────────────────
 
 variable "boot_from_volume" {

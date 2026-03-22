@@ -72,6 +72,12 @@ variable "k3s_version" {
   default     = ""
 }
 
+variable "use_fip" {
+  description = "是否建立 Floating IP（false=用內網 IP，透過 bastion 管理）"
+  type        = bool
+  default     = true
+}
+
 variable "boot_from_volume" {
   description = "是否從 volume 開機（flavor disk=0 的環境必須設 true）"
   type        = bool

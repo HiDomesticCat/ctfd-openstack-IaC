@@ -1,33 +1,34 @@
 # chell/modules/k3s/main.tf
-# k3s 叢集節點：master（固定 IP）+ workers
+# k3s 叢集節點：master + workers
 #
 # 設計重點：
-# 1. master floating IP 先行分配，用於 cloud-init TLS SAN → kubeconfig 直接包含外部 IP
-# 2. worker floating IP 先行分配，玩家透過 NodePort 連接 challenge
-# 3. 自建網路模式：master 使用 port 資源設定固定 IP，確保 worker 可用固定 IP join cluster
-# 4. Shared 網路模式：master 使用 DHCP IP，worker 透過 master FIP join cluster
+# 1. use_fip=true: FIP 先行分配，用於 cloud-init TLS SAN + 外部存取
+# 2. use_fip=false: 不建 FIP，用內網 IP，透過 bastion 管理（省 FIP 資源）
+# 3. 自建網路模式：master 使用 port 資源設定固定 IP
+# 4. Shared 網路模式：master 使用 DHCP IP，worker 透過 master 內網 IP join
 
 locals {
-  use_fixed_ip    = var.master_fixed_ip != ""
-  # Worker join 用的 master IP：有固定 IP 就用固定 IP，沒有就用 FIP
-  master_join_ip = local.use_fixed_ip ? var.master_fixed_ip : openstack_networking_floatingip_v2.master.address
+  use_fixed_ip = var.master_fixed_ip != ""
+  # Master 內網 IP（port 建好後才知道）
+  master_internal_ip = openstack_networking_port_v2.master.all_fixed_ips[0]
+  # Worker join 用的 master IP：有固定 IP > FIP > 內網 IP
+  master_join_ip = local.use_fixed_ip ? var.master_fixed_ip : local.master_internal_ip
+  # 對外 IP（給 TLS SAN 和 output 用）
+  master_external_ip = var.use_fip ? openstack_networking_floatingip_v2.master[0].address : local.master_internal_ip
 }
 
-# ── 預先分配 Floating IPs ──────────────────────────────────
-# 分配在 instance 建立前，使 cloud-init 可以直接使用這些 IP
+# ── Floating IPs（可選）────────────────────────────────────
 resource "openstack_networking_floatingip_v2" "master" {
-  pool = var.floating_ip_pool
+  count = var.use_fip ? 1 : 0
+  pool  = var.floating_ip_pool
 }
 
 resource "openstack_networking_floatingip_v2" "workers" {
-  count = var.worker_count
+  count = var.use_fip ? var.worker_count : 0
   pool  = var.floating_ip_pool
 }
 
 # ── Master Port ─────────────────────────────────────────────
-# 自建網路模式：固定 IP（worker cloud-init 不需等 DHCP 即可知道 master IP）
-# Shared 網路模式：DHCP 分配（worker 改用 master FIP join）
-
 resource "openstack_networking_port_v2" "master" {
   name           = "${var.master_name}-port"
   network_id     = var.network_id
@@ -78,7 +79,7 @@ resource "openstack_compute_instance_v2" "master" {
     k3s_token          = var.k3s_token
     k3s_version        = var.k3s_version
     master_fixed_ip    = local.use_fixed_ip ? var.master_fixed_ip : "0.0.0.0"
-    master_floating_ip = openstack_networking_floatingip_v2.master.address
+    master_floating_ip = local.master_external_ip
   })
 
   network {
@@ -89,7 +90,6 @@ resource "openstack_compute_instance_v2" "master" {
 }
 
 # ── k3s Worker Instances ──────────────────────────────────
-# 依賴 master instance 確保 cloud-init 等待時 master 已開始啟動
 resource "openstack_compute_instance_v2" "workers" {
   count       = var.worker_count
   name        = "${var.worker_name}-${count.index + 1}"
@@ -126,14 +126,15 @@ resource "openstack_compute_instance_v2" "workers" {
   ]
 }
 
-# ── Floating IP 關聯 ──────────────────────────────────────
+# ── Floating IP 關聯（可選）──────────────────────────────
 resource "openstack_networking_floatingip_associate_v2" "master" {
-  floating_ip = openstack_networking_floatingip_v2.master.address
+  count       = var.use_fip ? 1 : 0
+  floating_ip = openstack_networking_floatingip_v2.master[0].address
   port_id     = openstack_networking_port_v2.master.id
 }
 
 resource "openstack_networking_floatingip_associate_v2" "workers" {
-  count       = var.worker_count
+  count       = var.use_fip ? var.worker_count : 0
   floating_ip = openstack_networking_floatingip_v2.workers[count.index].address
   port_id     = openstack_networking_port_v2.workers[count.index].id
 }

@@ -106,6 +106,7 @@ module "k3s" {
   k3s_token        = var.k3s_token
   k3s_version      = var.k3s_version
   timezone         = var.timezone
+  use_fip          = var.use_fip
   boot_from_volume = var.boot_from_volume
   volume_size      = var.volume_size
 
@@ -127,6 +128,7 @@ resource "local_file" "ansible_inventory" {
     master_ip       = module.k3s.master_floating_ip
     worker_ips      = module.k3s.worker_floating_ips
     ssh_private_key = trimsuffix(var.public_key_path, ".pub")
+    bastion_ip      = var.bastion_ip
   })
   filename        = "${path.module}/../ansible/inventory/k3s_hosts.ini"
   file_permission = "0644"
