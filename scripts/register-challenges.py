@@ -244,9 +244,10 @@ class CTFdClient:
     def _set_pooler(self, challenge_id, pooler):
         """設定 Pooler 預分配池（透過 chall-manager plugin API）"""
         try:
+            # 欄位名是 "min" 和 "max"（見 ctfd_chall_manager/models.py）
             resp = self.session.patch(
                 f"{self.url}/api/v1/challenges/{challenge_id}",
-                json={"pool_min": pooler["min"], "pool_max": pooler["max"]},
+                json={"min": pooler["min"], "max": pooler["max"]},
             )
             if resp.ok:
                 print(f"      pooler: min={pooler['min']}, max={pooler['max']}")
