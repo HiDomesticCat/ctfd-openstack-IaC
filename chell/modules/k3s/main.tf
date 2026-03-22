@@ -78,7 +78,7 @@ resource "openstack_compute_instance_v2" "master" {
     timezone           = var.timezone
     k3s_token          = var.k3s_token
     k3s_version        = var.k3s_version
-    master_fixed_ip    = local.use_fixed_ip ? var.master_fixed_ip : "0.0.0.0"
+    master_fixed_ip    = local.use_fixed_ip ? var.master_fixed_ip : local.master_internal_ip
     master_floating_ip = local.master_external_ip
   })
 
