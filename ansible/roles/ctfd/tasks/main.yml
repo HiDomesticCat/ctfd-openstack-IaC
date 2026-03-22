@@ -137,6 +137,37 @@
   register: patch_result
   changed_when: "'patched' in patch_result.stdout and 'already' not in patch_result.stdout"
 
+# ── Patch: INSTANCE_NOT_FOUND 改為 200（消除錯誤彈窗）──────
+# 上游 bug: GET instance 回傳 NOT_FOUND 時 plugin 顯示 500 錯誤彈窗
+# Patch: NOT_FOUND 時回傳 200 + 空 data（UI 正常顯示 "Launch an instance"）
+# 參考: https://github.com/ctfer-io/ctfd-chall-manager/issues/232
+- name: Patch ctfd-chall-manager plugin — INSTANCE_NOT_FOUND 回傳 200
+  shell: |
+    FILE="{{ ctfd_deploy_dir }}/CTFd/plugins/ctfd_chall_manager/api/instance.py"
+    if grep -q 'return.*success.*True.*data.*{}.*200.*# PATCHED' "$FILE"; then
+      echo "already patched"
+      exit 0
+    fi
+    # 把 NOT_FOUND 的 raise 改為回傳 200
+    python3 -c "
+import re
+with open('$FILE', 'r') as f:
+    content = f.read()
+# 找到 get() 方法中的 except ChallManagerException 區塊，把 NOT_FOUND 情況改為回傳 200
+content = content.replace(
+    'raise e',
+    'if \"NOT_FOUND\" in str(e) or \"not found\" in str(e).lower():\n                    return {\"success\": True, \"data\": {}}, 200  # PATCHED\n                raise e',
+    1  # 只替換第一個（GET handler）
+)
+with open('$FILE', 'w') as f:
+    f.write(content)
+"
+    echo "patched"
+  args:
+    executable: /bin/bash
+  register: notfound_patch
+  changed_when: "'patched' in notfound_patch.stdout and 'already' not in notfound_patch.stdout"
+
 - name: 確保不存在幽靈資料夾（ctfd-chall-manager，連字號版本）
   file:
     path: "{{ ctfd_deploy_dir }}/CTFd/plugins/ctfd-chall-manager"
