@@ -183,17 +183,30 @@ func run(req *sdk.Request, resp *sdk.Response, opts ...pulumi.ResourceOption) er
 		sgID = sg.ID()
 	}
 
-	// ── VM + 網路 ──────────────────────────────────────────────
-	// use_fip=true  → 明確建 Port（FIP association 需要已知 Port ID）
-	// use_fip=false → 不建 Port，Nova 自動建立/刪除（少一個 Pulumi 資源，加速 destroy）
+	// ── Port + VM ───────────────────────────────────────────────
+	// Port 明確建立：SG 綁定 + 取得 IP + FIP 關聯都需要
 	// ConfigDrive: metadata 直接掛載為 ISO，cloud-init 不用等 DHCP 取 metadata（省 ~20s）
 	// ForceDelete: destroy 時跳過 graceful shutdown
+	port, err := networking.NewPort(ctx, prefix+"-port", &networking.PortArgs{
+		NetworkId:        pulumi.String(networkID),
+		SecurityGroupIds: pulumi.StringArray{sgID},
+		AdminStateUp:     pulumi.Bool(true),
+	}, withProv()...)
+	if err != nil {
+		return err
+	}
+
 	instanceArgs := &compute.InstanceArgs{
 		Name:        pulumi.String(prefix),
 		FlavorName:  pulumi.String(flavorName),
 		UserData:    pulumi.String(userData),
 		ConfigDrive: pulumi.Bool(true),
 		ForceDelete: pulumi.Bool(true),
+		Networks: compute.InstanceNetworkArray{
+			&compute.InstanceNetworkArgs{
+				Port: port.ID(),
+			},
+		},
 	}
 	if bootFromVolume {
 		instanceArgs.BlockDevices = compute.InstanceBlockDeviceArray{
@@ -209,32 +222,15 @@ func run(req *sdk.Request, resp *sdk.Response, opts ...pulumi.ResourceOption) er
 	} else {
 		instanceArgs.ImageId = pulumi.String(imageID)
 	}
+	_, err = compute.NewInstance(ctx, prefix+"-vm", instanceArgs, withProv()...)
+	if err != nil {
+		return err
+	}
 
+	// ── IP 取得（FIP 或內網 IP）────────────────────────────────
 	var connAddr pulumi.StringOutput
 
 	if useFIP {
-		// ── FIP 模式：需要明確 Port（FIP association 依賴 Port ID）────
-		port, err := networking.NewPort(ctx, prefix+"-port", &networking.PortArgs{
-			NetworkId:        pulumi.String(networkID),
-			SecurityGroupIds: pulumi.StringArray{sgID},
-			AdminStateUp:     pulumi.Bool(true),
-		}, withProv()...)
-		if err != nil {
-			return err
-		}
-
-		instanceArgs.Networks = compute.InstanceNetworkArray{
-			&compute.InstanceNetworkArgs{
-				Port: port.ID(),
-			},
-		}
-
-		vm, err := compute.NewInstance(ctx, prefix+"-vm", instanceArgs, withProv()...)
-		if err != nil {
-			return err
-		}
-		_ = vm
-
 		if fipAddress != "" {
 			_, err = networking.NewFloatingIpAssociate(ctx, prefix+"-fip-assoc", &networking.FloatingIpAssociateArgs{
 				FloatingIp: pulumi.String(fipAddress),
@@ -255,23 +251,9 @@ func run(req *sdk.Request, resp *sdk.Response, opts ...pulumi.ResourceOption) er
 			connAddr = fip.Address
 		}
 	} else {
-		// ── 內網模式：不建 Port，Nova 自動管理（加速 boot + destroy）────
-		instanceArgs.SecurityGroups = pulumi.StringArray{sgID}
-		instanceArgs.Networks = compute.InstanceNetworkArray{
-			&compute.InstanceNetworkArgs{
-				Uuid: pulumi.String(networkID),
-			},
-		}
-
-		vm, err := compute.NewInstance(ctx, prefix+"-vm", instanceArgs, withProv()...)
-		if err != nil {
-			return err
-		}
-
-		// 從 instance 的 network 資訊取得內網 IP（DHCP 分配）
-		connAddr = vm.Networks.ApplyT(func(networks []compute.InstanceNetwork) string {
-			if len(networks) > 0 && networks[0].FixedIpV4 != nil {
-				return *networks[0].FixedIpV4
+		connAddr = port.AllFixedIps.ApplyT(func(ips []string) string {
+			if len(ips) > 0 {
+				return ips[0]
 			}
 			return "unknown"
 		}).(pulumi.StringOutput)
