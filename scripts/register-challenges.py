@@ -159,11 +159,12 @@ def build_payload(challenge, defaults):
         "additional": additional,
     }
 
-    # Pooler 預分配池設定（可選）
-    if "pool_min" in challenge:
-        payload["pool_min"] = int(challenge["pool_min"])
-    if "pool_max" in challenge:
-        payload["pool_max"] = int(challenge["pool_max"])
+    # Pooler 設定（不在 create payload 中，需要單獨 PATCH）
+    if "pool_min" in challenge or "pool_max" in challenge:
+        payload["_pooler"] = {
+            "min": int(challenge.get("pool_min", 0)),
+            "max": int(challenge.get("pool_max", 0)),
+        }
 
     # 選填欄位
     if "timeout" in challenge:
@@ -214,21 +215,45 @@ class CTFdClient:
 
     def create_challenge(self, payload):
         """建立新題目"""
+        pooler = payload.pop("_pooler", None)
         resp = self.session.post(
             f"{self.url}/api/v1/challenges",
             json=payload,
         )
         resp.raise_for_status()
-        return resp.json()
+        result = resp.json()
+        # Pooler 設定需要單獨 PATCH（CTFd model 不接受 create 時帶 pool_min/pool_max）
+        if pooler and (pooler.get("min", 0) > 0 or pooler.get("max", 0) > 0):
+            cid = result.get("data", {}).get("id")
+            if cid:
+                self._set_pooler(cid, pooler)
+        return result
 
     def update_challenge(self, challenge_id, payload):
         """更新已存在的題目"""
+        pooler = payload.pop("_pooler", None)
         resp = self.session.patch(
             f"{self.url}/api/v1/challenges/{challenge_id}",
             json=payload,
         )
         resp.raise_for_status()
+        if pooler and (pooler.get("min", 0) > 0 or pooler.get("max", 0) > 0):
+            self._set_pooler(challenge_id, pooler)
         return resp.json()
+
+    def _set_pooler(self, challenge_id, pooler):
+        """設定 Pooler 預分配池（透過 chall-manager plugin API）"""
+        try:
+            resp = self.session.patch(
+                f"{self.url}/api/v1/challenges/{challenge_id}",
+                json={"pool_min": pooler["min"], "pool_max": pooler["max"]},
+            )
+            if resp.ok:
+                print(f"      pooler: min={pooler['min']}, max={pooler['max']}")
+            else:
+                print(f"      pooler: 設定失敗（HTTP {resp.status_code}）— 請手動在 CTFd UI 設定")
+        except Exception:
+            print(f"      pooler: 設定失敗 — 請手動在 CTFd UI 設定")
 
 
 # ── 主程式 ───────────────────────────────────────────────────
