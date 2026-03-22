@@ -40,15 +40,22 @@ def patch(filepath):
 
     # ── Patch 2: GET handler 檢查 flag 檔 ─────────────────────
     # 在 get_instance 呼叫前插入 flag 檢查
+    # ── Patch 2a: CREATE handler 清掉 destroy flag ────────────
+    # 建新 instance 時移除舊的 destroy flag，確保 GET 能顯示新 instance
+    old_create = 'r = create_instance(challenge_id, source_id)'
+    new_create = '''import os as _os  # PATCHED_ASYNC_DESTROY_CREATE
+            _dflag = f"/tmp/ctfd_destroying_{challenge_id}_{source_id}"
+            try: _os.remove(_dflag)
+            except: pass
+            r = create_instance(challenge_id, source_id)'''
+    content = content.replace(old_create, new_create, 1)
+
+    # ── Patch 2b: GET handler 檢查 flag 檔 ─────────────────────
     old_get = 'r = get_instance(challenge_id, source_id)'
-    new_get = '''import os, time  # PATCHED_ASYNC_DESTROY_GET
+    new_get = '''import os  # PATCHED_ASYNC_DESTROY_GET
             _flag = f"/tmp/ctfd_destroying_{challenge_id}_{source_id}"
             if os.path.exists(_flag):
-                if time.time() - os.path.getmtime(_flag) > 15:
-                    try: os.remove(_flag)
-                    except: pass
-                else:
-                    return {"success": True, "data": {}}, 200
+                return {"success": True, "data": {}}, 200
             r = get_instance(challenge_id, source_id)'''
     content = content.replace(old_get, new_get, 1)  # 只替換第一個（玩家 GET handler）
 
