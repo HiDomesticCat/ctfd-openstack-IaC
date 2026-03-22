@@ -67,15 +67,32 @@ def load_defaults():
 
 
 def load_challenge(path):
-    """載入單一 challenge.yml"""
-    challenge_file = Path(path)
-    if challenge_file.is_dir():
-        challenge_file = challenge_file / "challenge.yml"
+    """載入 challenge.yml，並用 challenge.local.yml 覆蓋（環境專屬設定）"""
+    challenge_dir = Path(path)
+    if not challenge_dir.is_dir():
+        challenge_dir = challenge_dir.parent
+    challenge_file = challenge_dir / "challenge.yml"
+    local_file = challenge_dir / "challenge.local.yml"
+
     if not challenge_file.exists():
         print(f"  [!] {challenge_file} 不存在，跳過")
         return None
     with open(challenge_file) as f:
-        return yaml.safe_load(f)
+        challenge = yaml.safe_load(f) or {}
+
+    # challenge.local.yml 覆蓋（gitignored，存放 image_id 等環境專屬值）
+    if local_file.exists():
+        with open(local_file) as f:
+            local = yaml.safe_load(f) or {}
+        # top-level 欄位直接覆蓋
+        for k, v in local.items():
+            if k == "additional" and isinstance(v, dict):
+                # additional 深層合併（local 優先）
+                challenge.setdefault("additional", {}).update(v)
+            else:
+                challenge[k] = v
+
+    return challenge
 
 
 def expand_scenario(scenario, defaults):

@@ -20,6 +20,10 @@ chell/terraform.tfvars
 environments/*
 !environments/_template/
 
+# ── Challenge 環境設定 ─────────────────────────────────────
+# per-challenge 環境專屬覆蓋（image_id 等，因環境而異）
+challenges/*/challenge.local.yml
+
 # ── Go ────────────────────────────────────────────────────
 # 編譯好的 scenario binary（由 Ansible 在目標機建置，不進 git）
 ansible/scenarios/openstack-vm/main

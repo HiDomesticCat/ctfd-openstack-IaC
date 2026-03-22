@@ -14,9 +14,8 @@ state: visible
 scenario: openstack-vm
 timeout: 3600
 
-# 題目專屬設定
+# 題目專屬設定（image_id 等環境專屬值放 challenge.local.yml）
 additional:
-  image_id: "SNAPSHOT_UUID"           # packer build 後填入
   port: "8080"
   base_flag: "web_example_flag"
   connection_info: "http://{ip}:{port}"

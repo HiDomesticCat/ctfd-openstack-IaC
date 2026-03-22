@@ -5,6 +5,8 @@
 #   challenges/<your-name>/packer/challenge.pkrvars.hcl  — Packer 變數
 #   challenges/<your-name>/packer/scripts/setup.sh       — 安裝腳本
 #   challenges/<your-name>/src/                          — 題目原始碼（選填）
+#   challenges/<your-name>/challenge.local.yml           — 環境專屬覆蓋（gitignored）
+#     例：additional: { image_id: "packer-snapshot-uuid" }
 
 name: "Challenge Name"
 category: "Pwn"                       # Web, Pwn, Reverse, Crypto, Misc...

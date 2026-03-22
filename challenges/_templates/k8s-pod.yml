@@ -1,5 +1,6 @@
 # 容器題範本（k8s-pod scenario）
 # 複製到 challenges/<your-name>/challenge.yml 後修改
+# 環境專屬覆蓋請建立 challenge.local.yml（gitignored）
 
 name: "Challenge Name"
 category: "Web"                       # Web, Pwn, Reverse, Crypto, Misc...
