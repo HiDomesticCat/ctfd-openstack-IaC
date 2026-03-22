@@ -1,0 +1,22 @@
+# Container Test — k8s-pod 題（測試用）
+# 用 nginx 驗證容器題流程
+
+name: "Container Test"
+category: "Web"
+description: |
+  A simple container challenge for testing.
+  Connect to the service and find the flag.
+value: 50
+type: dynamic_iac
+state: visible
+
+# chall-manager 設定
+scenario: k8s-pod
+timeout: 3600
+
+# 題目專屬設定
+additional:
+  image: "nginx:alpine"
+  port: "80"
+  base_flag: "container_test_flag"
+  connection_info: "http://{ip}:{port}"
