@@ -41,10 +41,14 @@ def patch(filepath):
     # ── Patch 2: GET handler 檢查 flag 檔 ─────────────────────
     # 在 get_instance 呼叫前插入 flag 檢查
     old_get = 'r = get_instance(challenge_id, source_id)'
-    new_get = '''import os  # PATCHED_ASYNC_DESTROY_GET
+    new_get = '''import os, time  # PATCHED_ASYNC_DESTROY_GET
             _flag = f"/tmp/ctfd_destroying_{challenge_id}_{source_id}"
             if os.path.exists(_flag):
-                return {"success": True, "data": {}}, 200
+                if time.time() - os.path.getmtime(_flag) > 15:
+                    try: os.remove(_flag)
+                    except: pass
+                else:
+                    return {"success": True, "data": {}}, 200
             r = get_instance(challenge_id, source_id)'''
     content = content.replace(old_get, new_get, 1)  # 只替換第一個（玩家 GET handler）
 
