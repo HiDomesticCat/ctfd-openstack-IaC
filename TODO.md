@@ -166,11 +166,58 @@ CTFD_TOKEN=ctfd_xxxxxxxxxxxx
 
 - [ ] 撰寫 `challenges/README.md`：完整出題者指南
   - 如何新增一道容器題（step by step）
+    - 情境 A：已有 Docker image（`docker save → push registry → challenge.yml`）
+    - 情境 B：有 Dockerfile + 原始碼（`make build-image → challenge.yml`）
+    - 情境 C：公開 registry image（直接在 challenge.yml 填 image 名稱）
   - 如何新增一道 VM 題（step by step）
+    - 情境 A：有原始碼 + setup script（Packer pipeline）
+    - 情境 B：已有 VM image/snapshot（直接填 image_id）
+  - 如何從舊 CTFd (Whale) 搬遷題目（docker save → push → k8s-pod）
   - challenge.yml 各欄位說明
   - 如何取得 OpenStack image_id / network_id / security_group_id
   - 如何測試題目（本地 + 部署後）
   - 如何更新已上架的題目
+  - Whale 舊題的 flag 限制（靜態 flag vs 動態 CTF_FLAG 環境變數）
+
+### 1.4 Container Image Build Pipeline
+
+**痛點：** 出題者拿到 Dockerfile + 原始碼時，沒有標準化的 build/push 流程。VM 題有完整的 Packer pipeline（`make packer-build`），但容器題缺少對應的自動化。
+
+**目標：** 出題者只需把 Dockerfile 放在 `challenges/<name>/` 下，一條命令完成 build → tag → push → 更新 challenge.yml。
+
+**目錄結構：**
+
+```
+challenges/<name>/
+├── challenge.yml          # 題目定義（image 欄位自動填入）
+├── Dockerfile             # 容器題用
+├── src/                   # 原始碼（可選）
+└── packer/                # VM 題用（與 Dockerfile 互斥）
+```
+
+**做法：**
+
+- [ ] 新增 `make build-image CHALLENGE=<name>` Makefile target
+  - `docker build -t localhost:5000/<name>:latest challenges/<name>/`
+  - `docker push localhost:5000/<name>:latest`
+  - 更新 challenge.yml 的 image 欄位（或確認已是短名稱）
+- [ ] 新增 `make deploy-container CHALLENGE=<name>`（build + push + register 一條龍）
+  - 對應 VM 題的 `make deploy-challenge`
+- [ ] 支援遠端 build（SSH 到 CTFd host 執行 docker build + push）
+  - 本地可能沒有 Docker 或連不到 registry
+
+### 1.5 Challenge 驗證工具
+
+**痛點：** challenge.yml 寫錯欄位或 image 不存在時，要等到註冊或玩家開題才會發現。
+
+**做法：**
+
+- [ ] 新增 `make validate-challenge CHALLENGE=<name>` 或 `scripts/validate-challenge.py`
+  - 檢查 challenge.yml 必填欄位（name, category, type, scenario, additional.image/image_id, additional.port, additional.base_flag）
+  - k8s-pod 題：確認 image 存在於 registry（`curl registry:5000/v2/<name>/tags/list`）
+  - openstack-vm 題：確認 image_id 存在於 OpenStack（`openstack image show <id>`）
+  - 檢查 scenario 名稱合法（k8s-pod 或 openstack-vm）
+- [ ] 整合到 `register-challenges.py`（`--validate` flag 或預設執行）
 
 ---
 
@@ -200,6 +247,7 @@ CTFD_TOKEN=ctfd_xxxxxxxxxxxx
 - [ ] 加入 Pod readiness/liveness probe 到 k8s-pod scenario
 - [ ] 考慮是否需要簡單的監控 dashboard（kubectl top + Grafana，或簡單 script）
 - [ ] 評估是否需要 CTFd API 批量操作工具
+- [ ] **調查 janitor 清理失敗問題** — 2026-03-22 發現 32 個 k8s-pod 超過 timeout（3600s）仍未被 janitor 清理。janitor log 顯示正常 janitoring 但無實際動作。可能原因：chall-manager instance state 與 k8s 實際 pod 不同步、janitor 查詢邏輯問題。需要查 chall-manager 的 instance list API 確認
 
 ---
 
