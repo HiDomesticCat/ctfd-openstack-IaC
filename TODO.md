@@ -256,6 +256,20 @@ CTFD_TOKEN=ctfd_xxxxxxxxxxxx
 - [ ] `packer-build` 自動更新 `challenge.yml` 的 `image_id`（目前需手動）
 - [ ] 考慮 container-based challenge 替代 VM（啟動 <5s）
 
+### 3.6 Pooler 預分配池（2026-03-22 驗證成功）
+
+> 實測結果：啟用 Pooler 後，容器題和 VM 題都從原本的 5s/60s+ 降到 ~5s（認領預建 instance）
+
+- [x] **Pooler 功能驗證** — chall-manager 原生 Pooler 功能，CTFd UI 設定 min/max 即可
+- [x] **Container Test (k8s-pod)** — min=3, max=5，預建 3 Pod，玩家 Boot ~5s 拿到 connection info
+- [x] **Web Example (openstack-vm)** — min=3, max=5，預建 3 VM，玩家 Boot ~5s 拿到 connection info
+- [ ] **冷路徑加速：readiness_timeout** — openstack-vm 新增可配置 readiness_timeout，預設跳過 waitForPort（冷建立 60s+ → ~42s）
+- [ ] **冷路徑加速：共用 Namespace** — k8s-pod 用共用 challenges namespace 取代 per-player namespace（冷建立 5s → ~3.5s）
+- [ ] **有 disk 的 challenge flavor** — 建立 `chall-1c2g-20d` 等 flavor，跳過 boot_from_volume（冷建立 42s → ~22s）
+- [ ] **Destroy 速度分析** — 清除 instance 耗時偏長，需分析各步驟並評估能否加速
+
+> 實測數據（lab50 環境）：Port 1.0s / Volume from image 23.3s / VM from volume 17.1s / VM from image (disk) 29.9s
+
 ### 3.4 未來升級：Ingress 模式（容器題）
 
 **現狀：** k8s-pod scenario 使用 NodePort，玩家看到 `http://worker-ip:3xxxx`，不夠直覺。
@@ -313,7 +327,7 @@ http://def67890.ctf.example.com → Pod B
 ## 決策紀錄
 
 - **openstack-vm scenario 保留** — 這是研究核心，不可捨棄。需要透過 snapshot、平行化等方式解決啟動速度問題。
-- **VM pool 暫不實作** — 投入產出比不高。Snapshot + 共用 SG + 資源平行化預計可將啟動時間從 60s+ 壓縮到 15-25s，對 CTF 比賽已足夠。若未來有需求再評估。
+- **VM pool 改用 chall-manager Pooler** — 之前「暫不實作」改為直接使用 chall-manager 原生 Pooler（2026-03-22 驗證成功）。零程式碼改動，CTFd UI 設定 min/max 即可。預建 instance 認領 <1ms（官方文件），實測含 CTFd UI 開銷 ~5s。資源策略：CT min=5（成本低）、VM min=3（每台 2GB RAM），搭配 mana 限制和題目分波釋出。
 - **chall-manager 不可替換，且功能足夠** — 已確認原生支援 `additional`（per-challenge `map<string,string>`），可解決多題目設定問題。需改用官方 SDK 來讀取。
 - **Image 分發採 pre-pull 策略** — 容器題：Ansible 預先 `crictl pull` 到 worker + `ImagePullPolicy: IfNotPresent`。VM 題：預先 bake snapshot image。兩者都是「賽前準備、賽中即用」。比賽中需更新時可重新 pull/snapshot 並更新 `additional`。
 - **Snapshot 製作用 Packer** — 出題者寫 Packer template（OpenStack builder + provision script），`packer build` 產出 image。放在 `challenges/` 目錄版本控制。
