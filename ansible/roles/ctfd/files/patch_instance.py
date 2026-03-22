@@ -36,22 +36,36 @@ def patch(filepath):
     content = content.replace(old_delete, new_delete, 1)  # 只替換第一個（玩家 handler）
 
     # ── Patch 2: GET handler 檢查 flag 檔 ─────────────────────
-    # 在 retrieve_instance 呼叫前插入 flag 檢查
-    old_retrieve = 'r = retrieve_instance(challenge_id, source_id)'
-    new_retrieve = '''import os  # PATCHED_ASYNC_DESTROY_GET
+    # 在 get_instance 呼叫前插入 flag 檢查
+    old_get = 'r = get_instance(challenge_id, source_id)'
+    new_get = '''import os  # PATCHED_ASYNC_DESTROY_GET
             _flag = f"/tmp/ctfd_destroying_{challenge_id}_{source_id}"
             if os.path.exists(_flag):
                 return {"success": True, "data": {}}, 200
-            r = retrieve_instance(challenge_id, source_id)'''
-    content = content.replace(old_retrieve, new_retrieve, 1)  # 只替換第一個（玩家 GET handler）
+            r = get_instance(challenge_id, source_id)'''
+    content = content.replace(old_get, new_get, 1)  # 只替換第一個（玩家 GET handler）
 
     # ── Patch 3: INSTANCE_NOT_FOUND 回傳 200 ──────────────────
-    # GET handler 的 except 中，NOT_FOUND 改為回傳 200
-    old_raise = 'raise e'
-    new_raise = '''if "NOT_FOUND" in str(e) or "not found" in str(e).lower():
-                    return {"success": True, "data": {}}, 200  # PATCHED_NOTFOUND
-                raise e'''
-    content = content.replace(old_raise, new_raise, 1)  # 只替換第一個（GET handler）
+    # GET handler 的 except ChallManagerException，NOT_FOUND 改為回傳 200
+    old_except = '''except ChallManagerException as e:
+            logger.error("error while getting instance: {e}")
+            return {
+                "success": False,
+                "data": {
+                    "message": f"Error while communicating with CM : {e}",
+                },
+            }, 500'''
+    new_except = '''except ChallManagerException as e:
+            if "NOT_FOUND" in str(e) or "not found" in str(e).lower():
+                return {"success": True, "data": {}}, 200  # PATCHED_NOTFOUND
+            logger.error("error while getting instance: {e}")
+            return {
+                "success": False,
+                "data": {
+                    "message": f"Error while communicating with CM : {e}",
+                },
+            }, 500'''
+    content = content.replace(old_except, new_except, 1)  # 只替換第一個（GET handler）
 
     with open(filepath, 'w') as f:
         f.write(content)
