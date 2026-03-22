@@ -159,6 +159,12 @@ def build_payload(challenge, defaults):
         "additional": additional,
     }
 
+    # Pooler 預分配池設定（可選）
+    if "pool_min" in challenge:
+        payload["pool_min"] = int(challenge["pool_min"])
+    if "pool_max" in challenge:
+        payload["pool_max"] = int(challenge["pool_max"])
+
     # 選填欄位
     if "timeout" in challenge:
         timeout_str = str(challenge["timeout"])

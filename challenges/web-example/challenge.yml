@@ -13,6 +13,8 @@ state: visible
 # chall-manager 設定
 scenario: openstack-vm
 timeout: 3600
+pool_min: 2
+pool_max: 3
 
 # 題目專屬設定（image_id 等環境專屬值放 challenge.local.yml）
 additional:

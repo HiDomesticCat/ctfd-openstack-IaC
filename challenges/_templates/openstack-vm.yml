@@ -21,6 +21,8 @@ state: hidden
 # chall-manager 設定
 scenario: openstack-vm                # 會展開為 registry:5000/openstack-vm:latest
 timeout: 3600                         # instance 存活秒數
+# pool_min: 2                         # 選填：Pooler 預分配最小數量（加速啟動）
+# pool_max: 5                         # 選填：Pooler 預分配最大數量
 
 # 題目專屬設定（基礎設施欄位由 challenge_defaults.yml 提供）
 additional:

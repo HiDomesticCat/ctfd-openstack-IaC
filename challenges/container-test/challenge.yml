@@ -13,6 +13,8 @@ state: visible
 # chall-manager 設定
 scenario: k8s-pod
 timeout: 3600
+pool_min: 3
+pool_max: 5
 
 # 題目專屬設定
 additional:
