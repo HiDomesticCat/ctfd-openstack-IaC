@@ -23,16 +23,19 @@ def patch(filepath):
     old_delete = 'delete_instance(challenge_id, source_id)'
     new_delete = '''_flag = f"/tmp/ctfd_destroying_{challenge_id}_{source_id}"  # PATCHED_ASYNC_DESTROY
             import threading, os
+            from flask import current_app
+            _app = current_app._get_current_object()
             open(_flag, 'w').close()
-            def _bg_delete(_cid, _sid, _f):
-                try:
-                    delete_instance(_cid, _sid)
-                except Exception:
-                    pass
-                finally:
-                    try: os.remove(_f)
-                    except: pass
-            threading.Thread(target=_bg_delete, args=(challenge_id, source_id, _flag), daemon=True).start()'''
+            def _bg_delete(_cid, _sid, _f, _application):
+                with _application.app_context():
+                    try:
+                        delete_instance(_cid, _sid)
+                    except Exception as _e:
+                        logger.error("async delete failed: %s", _e)
+                    finally:
+                        try: os.remove(_f)
+                        except: pass
+            threading.Thread(target=_bg_delete, args=(challenge_id, source_id, _flag, _app), daemon=True).start()'''
     content = content.replace(old_delete, new_delete, 1)  # 只替換第一個（玩家 handler）
 
     # ── Patch 2: GET handler 檢查 flag 檔 ─────────────────────
