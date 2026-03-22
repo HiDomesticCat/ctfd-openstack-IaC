@@ -16,6 +16,8 @@
 //   cpu_limit      CPU limit（預設 500m）
 //   memory_request Memory request（預設 128Mi）
 //   memory_limit   Memory limit（預設 512Mi）
+//   connection_info 連線資訊模板（支援 {ip} {port} 佔位符，預設 "nc {ip} {port}"）
+//                   範例："http://{ip}:{port}" / "ssh ctf@{ip} -p {port}"
 //
 // 建立的 Kubernetes 資源（每位玩家一組，以 shortID 隔離）：
 //   - Namespace  ctf-<shortID>          （玩家隔離邊界）
@@ -54,6 +56,8 @@ func main() {
 		flagPrefix := configOrEnv(req, "flag_prefix", "CHALLENGE_FLAG_PREFIX", "CTF")
 		image := configOrEnv(req, "image", "CHALLENGE_IMAGE", "ubuntu:22.04")
 		challengePortStr := configOrEnv(req, "port", "CHALLENGE_PORT", "22")
+
+		connTpl := configOrEnv(req, "connection_info", "", "nc {ip} {port}")
 
 		challengePort, _ := strconv.Atoi(challengePortStr)
 		if challengePort == 0 {
@@ -201,10 +205,7 @@ func main() {
 				return fmt.Sprintf("Service initializing... worker=%s", workerIP)
 			}
 			nodePort := *spec.Ports[0].NodePort
-			if challengePort == 22 {
-				return fmt.Sprintf("ssh ctf@%s -p %d", workerIP, nodePort)
-			}
-			return fmt.Sprintf("%s:%d", workerIP, nodePort)
+			return formatConnectionInfo(connTpl, workerIP, int(nodePort))
 		}).(pulumi.StringOutput)
 
 		resp.Flag = pulumi.String(flag).ToStringOutput()
@@ -224,6 +225,13 @@ func configOrEnv(req *sdk.Request, key, envKey, defaultVal string) string {
 		}
 	}
 	return defaultVal
+}
+
+// formatConnectionInfo 根據模板產生連線資訊
+// 支援 {ip} 和 {port} 佔位符，例如 "http://{ip}:{port}" → "http://1.2.3.4:8080"
+func formatConnectionInfo(tpl, ip string, port int) string {
+	r := strings.NewReplacer("{ip}", ip, "{port}", strconv.Itoa(port))
+	return r.Replace(tpl)
 }
 
 func envOrDefault(key, def string) string {

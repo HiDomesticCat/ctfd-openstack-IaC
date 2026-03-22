@@ -18,6 +18,8 @@
 //   flag_path         VM 內 flag 檔案路徑（預設 /opt/ctf/flag.txt）
 //   cloud_init        自訂 cloud-init 腳本（支援 {{FLAG}} {{PORT}} {{IDENTITY}} 佔位符）
 //   fip_address       預分配的 Floating IP 位址（跳過 FIP 建立，省 ~2-3s）
+//   connection_info   連線資訊模板（支援 {ip} {port} 佔位符，預設 "nc {ip} {port}"）
+//                     範例："http://{ip}:{port}" / "ssh ubuntu@{ip}" / "nc {ip} {port}"
 //
 // 啟動加速策略：
 //   1. Packer snapshot：出題者用 Packer 預先 bake 題目 image，VM 直接開機即可用
@@ -81,6 +83,7 @@ func run(req *sdk.Request, resp *sdk.Response, opts ...pulumi.ResourceOption) er
 	flagPath := configOrEnv(req, "flag_path", "", "/opt/ctf/flag.txt")
 	customCloudInit := configOrEnv(req, "cloud_init", "", "")
 	fipAddress := configOrEnv(req, "fip_address", "", "")
+	connTpl := configOrEnv(req, "connection_info", "", "nc {ip} {port}")
 
 	challengePort, err := strconv.Atoi(challengePortStr)
 	if err != nil {
@@ -254,7 +257,7 @@ func run(req *sdk.Request, resp *sdk.Response, opts ...pulumi.ResourceOption) er
 	// 等待 VM 上的 challenge service 真正就緒（TCP port 可連）
 	resp.ConnectionInfo = connAddr.ApplyT(func(ip string) string {
 		waitForPort(ip, challengePort, 120*time.Second)
-		return fmt.Sprintf("nc %s %d", ip, challengePort)
+		return formatConnectionInfo(connTpl, ip, challengePort)
 	}).(pulumi.StringOutput)
 	ctx.Export("ssh_command", connAddr.ApplyT(func(ip string) string {
 		return "ssh ubuntu@" + ip
@@ -317,6 +320,13 @@ func envOrDefault(key, def string) string {
 		return v
 	}
 	return def
+}
+
+// formatConnectionInfo 根據模板產生連線資訊
+// 支援 {ip} 和 {port} 佔位符，例如 "http://{ip}:{port}" → "http://1.2.3.4:8080"
+func formatConnectionInfo(tpl, ip string, port int) string {
+	r := strings.NewReplacer("{ip}", ip, "{port}", strconv.Itoa(port))
+	return r.Replace(tpl)
 }
 
 // waitForPort 等待 TCP port 可連線（服務就緒）

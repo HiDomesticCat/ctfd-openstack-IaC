@@ -1,0 +1,22 @@
+# Web Example — openstack-vm 題
+# HTTP header 注入 + 目錄遍歷
+
+name: "Web Example"
+category: "Web"
+description: |
+  A simple web challenge for testing.
+  Connect to the service and find the flag.
+value: 100
+type: dynamic_iac
+state: visible
+
+# chall-manager 設定
+scenario: openstack-vm
+timeout: 3600
+
+# 題目專屬設定
+additional:
+  image_id: "SNAPSHOT_UUID"           # packer build 後填入
+  port: "8080"
+  base_flag: "web_example_flag"
+  connection_info: "http://{ip}:{port}"
