@@ -59,10 +59,11 @@ locals {
 module "secgroup" {
   source = "./modules/secgroup"
 
-  secgroup_name        = "ctfd-sg"
-  secgroup_description = "CTFd Server Security Group"
-  ssh_allowed_cidr     = var.ssh_allowed_cidr
-  ctfd_port            = var.ctfd_port
+  secgroup_name          = "ctfd-sg"
+  secgroup_description   = "CTFd Server Security Group"
+  ssh_allowed_cidr       = var.ssh_allowed_cidr
+  ctfd_port              = var.ctfd_port
+  registry_allowed_cidr  = var.registry_allowed_cidr
 
   providers = { openstack = openstack }
 }

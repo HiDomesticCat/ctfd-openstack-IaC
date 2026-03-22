@@ -95,3 +95,9 @@ variable "timezone" {
   type        = string
   default     = "Asia/Taipei"
 }
+
+variable "registry_ip" {
+  description = "CTFd Docker Registry IP（k3s registries.yaml 用，空字串=不設定）"
+  type        = string
+  default     = ""
+}

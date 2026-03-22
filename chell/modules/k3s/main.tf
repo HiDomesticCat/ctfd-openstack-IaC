@@ -80,6 +80,7 @@ resource "openstack_compute_instance_v2" "master" {
     k3s_version        = var.k3s_version
     master_fixed_ip    = local.use_fixed_ip ? var.master_fixed_ip : local.master_internal_ip
     master_floating_ip = local.master_external_ip
+    registry_ip        = var.registry_ip
   })
 
   network {
@@ -114,6 +115,7 @@ resource "openstack_compute_instance_v2" "workers" {
     k3s_token       = var.k3s_token
     k3s_version     = var.k3s_version
     master_fixed_ip = local.master_join_ip
+    registry_ip     = var.registry_ip
   })
 
   network {

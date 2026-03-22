@@ -15,6 +15,16 @@ packages:
   - netcat-openbsd
 
 write_files:
+%{~ if registry_ip != "" }
+  - path: /etc/rancher/k3s/registries.yaml
+    permissions: '0644'
+    owner: root:root
+    content: |
+      mirrors:
+        "${registry_ip}:5000":
+          endpoint:
+            - "http://${registry_ip}:5000"
+%{~ endif }
   - path: /opt/k3s-agent-init.sh
     permissions: '0755'
     owner: root:root

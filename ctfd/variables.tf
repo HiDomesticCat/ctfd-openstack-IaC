@@ -92,6 +92,12 @@ variable "ctfd_port" {
   }
 }
 
+variable "registry_allowed_cidr" {
+  description = "允許存取 Docker Registry (5000) 的來源 CIDR（k3s 節點子網，空字串=不建立規則）"
+  type        = string
+  default     = ""
+}
+
 # ── Instance ───────────────────────────────────────────────
 variable "instance_name" {
   description = "CTFd VM 名稱"

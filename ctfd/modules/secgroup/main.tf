@@ -48,3 +48,16 @@ resource "openstack_networking_secgroup_rule_v2" "ctfd" {
   remote_ip_prefix  = "0.0.0.0/0"
   security_group_id = openstack_networking_secgroup_v2.this.id
 }
+
+# Docker Registry（供 k3s 節點 pull challenge image）
+# 限制來源為內網 CIDR，不對外開放
+resource "openstack_networking_secgroup_rule_v2" "registry" {
+  count             = var.registry_allowed_cidr != "" ? 1 : 0
+  direction         = "ingress"
+  ethertype         = "IPv4"
+  protocol          = "tcp"
+  port_range_min    = 5000
+  port_range_max    = 5000
+  remote_ip_prefix  = var.registry_allowed_cidr
+  security_group_id = openstack_networking_secgroup_v2.this.id
+}

@@ -23,6 +23,12 @@ variable "ssh_allowed_cidr" {
   }
 }
 
+variable "registry_allowed_cidr" {
+  description = "允許存取 Docker Registry (5000) 的來源 CIDR（k3s 節點所在子網），空字串=不建立規則"
+  type        = string
+  default     = ""
+}
+
 variable "ctfd_port" {
   description = "CTFd 應用程式 Port"
   type        = number

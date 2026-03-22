@@ -109,6 +109,7 @@ module "k3s" {
   use_fip          = var.use_fip
   boot_from_volume = var.boot_from_volume
   volume_size      = var.volume_size
+  registry_ip      = var.registry_ip
 
   depends_on = [module.network, module.secgroup]
 }
