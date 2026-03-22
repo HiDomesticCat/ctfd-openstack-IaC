@@ -104,7 +104,7 @@ func main() {
 			namespaceName = pulumi.String(sharedNSName).ToStringOutput()
 		} else {
 			nsName := fmt.Sprintf("ctf-%s", sid)
-			ns, err := corev1.NewNamespace(ctx, "ns", &corev1.NamespaceArgs{
+			ns, nsErr := corev1.NewNamespace(ctx, "ns", &corev1.NamespaceArgs{
 				Metadata: &metav1.ObjectMetaArgs{
 					Name: pulumi.String(nsName),
 					Labels: pulumi.StringMap{
@@ -117,14 +117,14 @@ func main() {
 					},
 				},
 			}, opts...)
-			if err != nil {
-				return fmt.Errorf("create namespace: %w", err)
+			if nsErr != nil {
+				return fmt.Errorf("create namespace: %w", nsErr)
 			}
-			namespaceName = namespaceName.Elem()
+			namespaceName = ns.Metadata.Name().Elem()
 		}
 
 		// ── Challenge Pod ──────────────────────────────────
-		_, err = corev1.NewPod(ctx, "pod", &corev1.PodArgs{
+		_, err := corev1.NewPod(ctx, "pod", &corev1.PodArgs{
 			Metadata: &metav1.ObjectMetaArgs{
 				Namespace: namespaceName,
 				Name:      pulumi.String(podName),
