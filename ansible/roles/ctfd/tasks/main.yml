@@ -144,24 +144,11 @@
 - name: Patch ctfd-chall-manager plugin — INSTANCE_NOT_FOUND 回傳 200
   shell: |
     FILE="{{ ctfd_deploy_dir }}/CTFd/plugins/ctfd_chall_manager/api/instance.py"
-    if grep -q 'return.*success.*True.*data.*{}.*200.*# PATCHED' "$FILE"; then
+    if grep -q 'PATCHED_NOTFOUND' "$FILE"; then
       echo "already patched"
       exit 0
     fi
-    # 把 NOT_FOUND 的 raise 改為回傳 200
-    python3 -c "
-import re
-with open('$FILE', 'r') as f:
-    content = f.read()
-# 找到 get() 方法中的 except ChallManagerException 區塊，把 NOT_FOUND 情況改為回傳 200
-content = content.replace(
-    'raise e',
-    'if \"NOT_FOUND\" in str(e) or \"not found\" in str(e).lower():\n                    return {\"success\": True, \"data\": {}}, 200  # PATCHED\n                raise e',
-    1  # 只替換第一個（GET handler）
-)
-with open('$FILE', 'w') as f:
-    f.write(content)
-"
+    sed -i '0,/raise e/{s/raise e/if "NOT_FOUND" in str(e) or "not found" in str(e).lower(): return {"success": True, "data": {}}, 200  # PATCHED_NOTFOUND\n                raise e/}' "$FILE"
     echo "patched"
   args:
     executable: /bin/bash
