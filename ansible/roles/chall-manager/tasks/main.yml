@@ -125,6 +125,38 @@
     owner: ubuntu
     group: ubuntu
 
+# ✅ 必須在 Docker Compose 啟動前建立「檔案」，否則 Docker bind mount
+# 發現 source 不存在會自動建成「目錄」，導致 k3s role 複製 kubeconfig 時失敗
+- name: 建立 kubeconfig 目錄
+  file:
+    path: "{{ chall_manager_dir }}/kubeconfig"
+    state: directory
+    mode: "0700"
+    owner: ubuntu
+    group: ubuntu
+
+- name: 確保 kubeconfig 是檔案而非目錄（防止 Docker 自動建目錄）
+  shell: |
+    path="{{ chall_manager_dir }}/kubeconfig/k3s.yaml"
+    if [ -d "$path" ]; then
+      rm -rf "$path"
+      touch "$path"
+      chown ubuntu:ubuntu "$path"
+      chmod 600 "$path"
+      echo "fixed"
+    elif [ ! -f "$path" ]; then
+      touch "$path"
+      chown ubuntu:ubuntu "$path"
+      chmod 600 "$path"
+      echo "created"
+    else
+      echo "ok"
+    fi
+  args:
+    executable: /bin/bash
+  register: kubeconfig_placeholder
+  changed_when: kubeconfig_placeholder.stdout != "ok"
+
 # ── 同步 scenarios 原始碼到遠端 ───────────────────────────────
 - name: 同步 scenarios/ 到遠端（rsync）
   synchronize:
