@@ -69,6 +69,7 @@ func run(req *sdk.Request, resp *sdk.Response, opts ...pulumi.ResourceOption) er
 	}
 	flavorName := configOrEnv(req, "flavor", "CHALLENGE_FLAVOR", "general.small")
 	fipPool := configOrEnv(req, "fip_pool", "CHALLENGE_FIP_POOL", "public")
+	useFIP := configOrEnv(req, "use_fip", "CHALLENGE_USE_FIP", "true") == "true"
 	bootFromVolume := configOrEnv(req, "boot_from_volume", "CHALLENGE_BOOT_FROM_VOLUME", "false") == "true"
 	volumeSizeStr := configOrEnv(req, "volume_size", "CHALLENGE_VOLUME_SIZE", "10")
 	volumeSize, _ := strconv.Atoi(volumeSizeStr)
@@ -212,45 +213,53 @@ func run(req *sdk.Request, resp *sdk.Response, opts ...pulumi.ResourceOption) er
 		return err
 	}
 
-	// ── Floating IP ──────────────────────────────────────────
-	// 取得 FIP 的 IP 位址 output，用於 readiness check 和 connectionInfo
-	var fipAddr pulumi.StringOutput
+	// ── IP 取得（FIP 或內網 IP）────────────────────────────────
+	// use_fip=true  → 建立 FIP，玩家透過 FIP 連線（傳統模式）
+	// use_fip=false → 不建 FIP，玩家透過 VPN 用內網 IP 連線（省資源、更快）
+	var connAddr pulumi.StringOutput
 
-	if fipAddress != "" {
-		// 使用預分配的 FIP（省 ~2-3s FIP 建立時間）
-		// FloatingIpAssociate 只管理關聯，不建立/刪除 FIP 本身
-		_, err = networking.NewFloatingIpAssociate(ctx, prefix+"-fip-assoc", &networking.FloatingIpAssociateArgs{
-			FloatingIp: pulumi.String(fipAddress),
-			PortId:     port.ID(),
-		}, withProv()...)
-		if err != nil {
-			return err
+	if useFIP {
+		if fipAddress != "" {
+			// 使用預分配的 FIP（省 ~2-3s FIP 建立時間）
+			_, err = networking.NewFloatingIpAssociate(ctx, prefix+"-fip-assoc", &networking.FloatingIpAssociateArgs{
+				FloatingIp: pulumi.String(fipAddress),
+				PortId:     port.ID(),
+			}, withProv()...)
+			if err != nil {
+				return err
+			}
+			connAddr = pulumi.String(fipAddress).ToStringOutput()
+		} else {
+			// 建立新 FIP
+			fip, err := networking.NewFloatingIp(ctx, prefix+"-fip", &networking.FloatingIpArgs{
+				Pool:   pulumi.String(fipPool),
+				PortId: port.ID(),
+			}, withProv()...)
+			if err != nil {
+				return err
+			}
+			connAddr = fip.Address
 		}
-		fipAddr = pulumi.String(fipAddress).ToStringOutput()
 	} else {
-		// 建立新 FIP（建立時直接指定 port，一步完成關聯）
-		fip, err := networking.NewFloatingIp(ctx, prefix+"-fip", &networking.FloatingIpArgs{
-			Pool:   pulumi.String(fipPool),
-			PortId: port.ID(),
-		}, withProv()...) // port.ID() 已建立隱式依賴；不依賴 VM → FIP 與 VM 平行建立
-		if err != nil {
-			return err
-		}
-		fipAddr = fip.Address
+		// 不建 FIP，用 port 的內網 IP（玩家透過 VPN 連入）
+		connAddr = port.AllFixedIps.ApplyT(func(ips []string) string {
+			if len(ips) > 0 {
+				return ips[0]
+			}
+			return "unknown"
+		}).(pulumi.StringOutput)
 	}
 
 	// ── Readiness Check ─────────────────────────────────────
 	// 等待 VM 上的 challenge service 真正就緒（TCP port 可連）
-	// Pulumi 會等 ApplyT 完成才回傳結果給 chall-manager → CTFd
-	// 這樣玩家拿到 URL 時，服務保證可用
-	resp.ConnectionInfo = fipAddr.ApplyT(func(ip string) string {
+	resp.ConnectionInfo = connAddr.ApplyT(func(ip string) string {
 		waitForPort(ip, challengePort, 120*time.Second)
-		return fmt.Sprintf("http://%s:%d", ip, challengePort)
+		return fmt.Sprintf("nc %s %d", ip, challengePort)
 	}).(pulumi.StringOutput)
-	ctx.Export("ssh_command", fipAddr.ApplyT(func(ip string) string {
+	ctx.Export("ssh_command", connAddr.ApplyT(func(ip string) string {
 		return "ssh ubuntu@" + ip
 	}).(pulumi.StringOutput))
-	ctx.Export("floating_ip", fipAddr)
+	ctx.Export("connection_ip", connAddr)
 
 	resp.Flag = pulumi.String(flag).ToStringOutput()
 	return nil
