@@ -271,11 +271,15 @@ CTFD_TOKEN=ctfd_xxxxxxxxxxxx
 - [x] **ForceDelete** — openstack-vm 加 `ForceDelete: true` 跳過 VM graceful shutdown
 - [x] **Polling 加速** — waitForPort polling interval 2s→1s，dial timeout 3s→2s
 - [x] **Destroy 異步化** — Patch CTFd plugin 的 delete handler 用 threading 背景執行 delete_instance，玩家點 Destroy 秒消失（與 timeout 到期行為一致）
+- [x] **Race condition 修復** — CREATE handler 等待背景刪除完成（flag 檔消失）才呼叫 create_instance，避免新 instance 被背景 delete 誤殺。換題（刪 A 開 B）不受影響（不同 challenge_id 無 flag 檔）
+- [x] **防濫用** — DELETE handler 檢查 flag 檔：已在刪除中則跳過（不重複觸發背景 thread）。搭配 mana=1 限制每人同時 1 台 instance
 
 > 實測數據（lab50 環境 2026-03-22）：
 > - OpenStack：Port 1.0s / Volume from image 23.3s / VM from volume 17.1s / VM from image (disk) 29.9s
 > - chall-manager：CT Pool claim 2ms / CT cold 4.7s / VM cold (optimized) 24.5s / CT destroy 1.5s / VM destroy 11s (Nova 固有)
 > - Destroy 異步化後：玩家體感 <1s（背景 11s 清理不影響 UX）
+> - 同題重開：Destroy 秒回 + Boot 等 ~1.5s(CT)/~11s(VM) 背景刪除完成 + Pooler 認領
+> - 換題：Destroy 秒回 + Boot 秒回（不同 challenge，無衝突）
 
 ### 3.4 未來升級：Ingress 模式（容器題）
 
@@ -351,4 +355,6 @@ http://def67890.ctf.example.com → Pod B
 - **Readiness check 用 TCP 而非 HTTP** — scenario 中的 `waitForPort()` 使用 TCP connect 檢查（`net.DialTimeout`），適用所有題型（HTTP/SSH/TCP/NC）。timeout 120s 不會 fail deployment，只 log warning。玩家拿到 URL 時保證服務已就緒。
 - **Image 預熱必要** — 新 image 首次在 compute node 上使用時有 ~30s cold start penalty（Glance→本地 cache 複製）。`make packer-warmup` 透過建立/刪除暫時 VM 觸發 cache。賽前必須執行。
 - **VM Destroy 異步化** — Nova VM 刪除固有耗時 ~11s（Pulumi poll 等 instance 消失），無法從程式碼層面加速。解法：Patch CTFd plugin 的 delete handler 用 `threading.Thread` 背景執行 `delete_instance`，玩家體感 <1s。與 timeout 到期自動消失的行為一致。Ansible 每次部署自動重新打 patch（冪等）。
+- **Async destroy race condition** — 背景 thread 刪除舊 instance 的同時 create 新 instance 會導致新 instance 被誤殺（同一 challenge_id/source_id）。CREATE handler 必須等 flag 檔消失（= 刪除完成）再呼叫 create_instance。換題（刪 A 開 B）不受此限制。
 - **Pooler API 欄位名** — CTFd chall-manager plugin model 的 Pooler 欄位名是 `min` 和 `max`（不是 `pool_min`/`pool_max`）。不能在 POST 建題時帶入（會 500），必須先 POST 再 PATCH。
+- **測試殘留資源清理** — Pooler + 測試迭代會累積大量 ctf-* VM/volume/port，需定期清理。流程：停 chall-manager → `openstack server delete` 所有 ctf-* → 清 orphan volume/port → 啟 chall-manager → 重新 register-challenges。
