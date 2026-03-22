@@ -261,14 +261,21 @@ CTFD_TOKEN=ctfd_xxxxxxxxxxxx
 > 實測結果：啟用 Pooler 後，容器題和 VM 題都從原本的 5s/60s+ 降到 ~5s（認領預建 instance）
 
 - [x] **Pooler 功能驗證** — chall-manager 原生 Pooler 功能，CTFd UI 設定 min/max 即可
+- [x] **Pooler as Code** — challenge.yml 的 `pool_min`/`pool_max` 由 register-challenges.py 自動 PATCH 到 CTFd（API 欄位名 `min`/`max`）
 - [x] **Container Test (k8s-pod)** — min=3, max=5，預建 3 Pod，玩家 Boot ~5s 拿到 connection info
-- [x] **Web Example (openstack-vm)** — min=3, max=5，預建 3 VM，玩家 Boot ~5s 拿到 connection info
-- [ ] **冷路徑加速：readiness_timeout** — openstack-vm 新增可配置 readiness_timeout，預設跳過 waitForPort（冷建立 60s+ → ~42s）
-- [ ] **冷路徑加速：共用 Namespace** — k8s-pod 用共用 challenges namespace 取代 per-player namespace（冷建立 5s → ~3.5s）
-- [ ] **有 disk 的 challenge flavor** — 建立 `chall-1c2g-20d` 等 flavor，跳過 boot_from_volume（冷建立 42s → ~22s）
-- [ ] **Destroy 速度分析** — 清除 instance 耗時偏長，需分析各步驟並評估能否加速
+- [x] **Web Example (openstack-vm)** — min=2, max=3，預建 VM，玩家 Boot ~5s 拿到 connection info
+- [x] **冷路徑加速：readiness_timeout** — openstack-vm 新增可配置 readiness_timeout（預設 "0" 跳過 waitForPort），冷建立 60s+ → ~24.5s
+- [x] **冷路徑加速：共用 Namespace** — k8s-pod 預設用共用 challenges namespace（`use_shared_namespace=true`），省一次 K8s API call，加速 boot + destroy
+- [x] **冷路徑加速：no-FIP 跳過 Port** — `use_fip=false` 時不明確建 Port，Nova 自動管理，Pulumi 少一個資源
+- [x] **有 disk 的 challenge flavor** — 建立 `chall-1c2g-20d` / `chall-2c4g-20d`，跳過 boot_from_volume（省 volume 建立 23s）
+- [x] **ForceDelete** — openstack-vm 加 `ForceDelete: true` 跳過 VM graceful shutdown
+- [x] **Polling 加速** — waitForPort polling interval 2s→1s，dial timeout 3s→2s
+- [x] **Destroy 異步化** — Patch CTFd plugin 的 delete handler 用 threading 背景執行 delete_instance，玩家點 Destroy 秒消失（與 timeout 到期行為一致）
 
-> 實測數據（lab50 環境）：Port 1.0s / Volume from image 23.3s / VM from volume 17.1s / VM from image (disk) 29.9s
+> 實測數據（lab50 環境 2026-03-22）：
+> - OpenStack：Port 1.0s / Volume from image 23.3s / VM from volume 17.1s / VM from image (disk) 29.9s
+> - chall-manager：CT Pool claim 2ms / CT cold 4.7s / VM cold (optimized) 24.5s / CT destroy 1.5s / VM destroy 11s (Nova 固有)
+> - Destroy 異步化後：玩家體感 <1s（背景 11s 清理不影響 UX）
 
 ### 3.4 未來升級：Ingress 模式（容器題）
 
@@ -343,3 +350,5 @@ http://def67890.ctf.example.com → Pod B
 - **Config-drive 優於 metadata service** — 壓力測試發現 cloud-init DHCP→metadata 等待耗時 ~23s。改用 config-drive（metadata 燒成 ISO 掛載）後此等待消除，是最大單一優化（-16s）。cloud-init network config 不可停用（VM 仍需 DHCP 取得 IP），但 datasource 可改為 ConfigDrive 優先。
 - **Readiness check 用 TCP 而非 HTTP** — scenario 中的 `waitForPort()` 使用 TCP connect 檢查（`net.DialTimeout`），適用所有題型（HTTP/SSH/TCP/NC）。timeout 120s 不會 fail deployment，只 log warning。玩家拿到 URL 時保證服務已就緒。
 - **Image 預熱必要** — 新 image 首次在 compute node 上使用時有 ~30s cold start penalty（Glance→本地 cache 複製）。`make packer-warmup` 透過建立/刪除暫時 VM 觸發 cache。賽前必須執行。
+- **VM Destroy 異步化** — Nova VM 刪除固有耗時 ~11s（Pulumi poll 等 instance 消失），無法從程式碼層面加速。解法：Patch CTFd plugin 的 delete handler 用 `threading.Thread` 背景執行 `delete_instance`，玩家體感 <1s。與 timeout 到期自動消失的行為一致。Ansible 每次部署自動重新打 patch（冪等）。
+- **Pooler API 欄位名** — CTFd chall-manager plugin model 的 Pooler 欄位名是 `min` 和 `max`（不是 `pool_min`/`pool_max`）。不能在 POST 建題時帶入（會 500），必須先 POST 再 PATCH。
