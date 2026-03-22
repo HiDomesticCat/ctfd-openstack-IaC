@@ -256,6 +256,27 @@ CTFD_TOKEN=ctfd_xxxxxxxxxxxx
 - [ ] `packer-build` 自動更新 `challenge.yml` 的 `image_id`（目前需手動）
 - [ ] 考慮 container-based challenge 替代 VM（啟動 <5s）
 
+### 3.4 未來升級：Ingress 模式（容器題）
+
+**現狀：** k8s-pod scenario 使用 NodePort，玩家看到 `http://worker-ip:3xxxx`，不夠直覺。
+
+**目標：** 改用 Nginx Ingress + wildcard DNS，每位玩家拿到子域名：
+```
+http://abc12345.ctf.example.com → Pod A
+http://def67890.ctf.example.com → Pod B
+```
+
+- [ ] 部署 Nginx Ingress Controller 到 k3s
+- [ ] 設定 wildcard DNS（`*.ctf.example.com → worker IP`）
+- [ ] 修改 k8s-pod scenario：建立 Ingress 資源取代 NodePort Service
+- [ ] connection_info 顯示子域名 URL 而非 IP:port
+
+### 3.5 已修復的部署問題（2026-03-22）
+
+- [x] **connection_info 寫死 nc 格式** — openstack-vm 和 k8s-pod scenario 加入 `connection_info` template 參數，支援 `{ip}` `{port}` 佔位符（預設 `nc {ip} {port}`，可設 `http://{ip}:{port}` 等）
+- [x] **challenge.local.yml 環境覆蓋** — 新增 per-challenge gitignored 覆蓋檔，合併順序：`challenge_defaults.yml` → `challenge.yml` → `challenge.local.yml`。解決 image_id 等環境專屬值不該進 git 的問題
+- [x] **kubeconfig 被 Docker 建成目錄** — chall-manager role 的 `docker compose up` 先於 k3s role 部署 kubeconfig，Docker bind mount 對不存在的 source 自動建目錄。修復：在 docker compose up 前預建 placeholder 空檔案
+
 ### 3.2 安全性強化
 
 - [ ] `PULUMI_CONFIG_PASSPHRASE` 改為非空值（目前 state 未加密）
