@@ -20,7 +20,7 @@ timeout: 3600                         # instance 存活秒數（預設無限）
 
 # 題目專屬設定
 additional:
-  image: "your-image:v1"              # Docker image（需先 push 到 registry）
+  image: "your-image:v1"              # Docker image（push 到 registry 後只需寫名稱，CHALLENGE_REGISTRY 自動加 prefix）
   port: "8080"                        # 服務 port
   base_flag: "your_flag_here"         # 基礎 flag（會被 sdk.Variate 加工）
   # connection_info: "http://{ip}:{port}" # 選填：連線資訊模板（{ip} {port} 佔位符）

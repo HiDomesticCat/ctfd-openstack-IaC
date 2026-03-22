@@ -111,7 +111,7 @@ challenges/
 - [x] 建立 `challenges/` 目錄與結構
 - [x] 建立 k8s-pod 範本（`_templates/k8s-pod.yml`）
 - [x] 建立 openstack-vm 範本（`_templates/openstack-vm.yml`）
-- [x] 已有 openstack-vm 範例（`web-example/`）；k8s-pod 範例待建立
+- [x] 已有 openstack-vm 範例（`web-example/`）；k8s-pod 範例：`container-test/`、`exchange/`（從舊 CTFd Whale 搬遷的實戰題）
 
 #### 1.3.3 Registration Script（Python）
 
@@ -332,11 +332,16 @@ http://def67890.ctf.example.com → Pod B
 - [x] **1.3 .env 管理**：`.env.example` 範本 + `.gitignore` 加入 `.env`
 - [x] **1.3 challenge templates**：`_templates/k8s-pod.yml` + `_templates/openstack-vm.yml`
 - [x] **Packer file provisioner**：`build.pkr.hcl` 新增 file provisioner + `challenge_files` 變數，支援複製題目原始碼到 VM
+- [x] **CHALLENGE_REGISTRY 自動 prefix**：k8s-pod scenario `resolveImage()` 自動加上 registry prefix，challenge.yml 只需寫 `image: "exchange:latest"`。`CHALLENGE_REGISTRY` 由 docker-compose.yml.j2 帶入（`ansible_default_ipv4.address:5000`）
+- [x] **Registry secgroup rule (tofu)**：`ctfd/modules/secgroup` 新增 port 5000 規則（`registry_allowed_cidr` 變數），限制來源為 k3s 子網
+- [x] **k3s registries.yaml (cloud-init)**：`agent.yaml.tpl` / `server.yaml.tpl` 新增 `registries.yaml` 自動建立（`registry_ip` 變數），k3s containerd 信任 HTTP registry
+- [x] **Exchange 題目搬遷**：從舊 CTFd (Whale) 搬遷 `final/exchange` 到新 CTFd (chall-manager)，驗證 `docker save → registry push → k8s-pod scenario` 全流程
 
 ---
 
 ## 決策紀錄
 
+- **Whale 題目搬遷策略** — 舊 CTFd (Whale) 的 Docker image 可直接搬到新 CTFd (chall-manager) 使用 k8s-pod scenario。流程：`docker save → scp → docker load → docker tag/push localhost:5000 → 建 challenge.yml → register`。注意：Whale 題目的 flag 通常是靜態的（hardcoded），chall-manager 會額外注入 `CTF_FLAG` 環境變數但原題目不一定會讀取。若需動態 flag，需修改題目程式碼。
 - **openstack-vm scenario 保留** — 這是研究核心，不可捨棄。需要透過 snapshot、平行化等方式解決啟動速度問題。
 - **VM pool 改用 chall-manager Pooler** — 之前「暫不實作」改為直接使用 chall-manager 原生 Pooler（2026-03-22 驗證成功）。零程式碼改動，CTFd UI 設定 min/max 即可。預建 instance 認領 <1ms（官方文件），實測含 CTFd UI 開銷 ~5s。資源策略：CT min=5（成本低）、VM min=3（每台 2GB RAM），搭配 mana 限制和題目分波釋出。
 - **chall-manager 不可替換，且功能足夠** — 已確認原生支援 `additional`（per-challenge `map<string,string>`），可解決多題目設定問題。需改用官方 SDK 來讀取。

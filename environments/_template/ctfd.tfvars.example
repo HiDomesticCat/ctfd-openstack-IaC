@@ -16,3 +16,7 @@ instance_name    = "ctfd-research"
 # ── SSH ──────────────────────────────────────────────────────
 keypair_name    = "ctfd-key"
 public_key_path = "~/.ssh/id_rsa.pub"
+
+# ── Registry Security Group（k3s 節點存取 Docker Registry）───
+# k3s 節點所在子網的 CIDR，空字串=不建立規則
+# registry_allowed_cidr = "192.168.234.0/24"

@@ -20,3 +20,8 @@ public_key_path = "~/.ssh/id_rsa.pub"
 
 # ── k3s ──────────────────────────────────────────────────────
 k3s_token = "<GENERATE_WITH: openssl rand -hex 32>"
+
+# ── Registry（k3s 節點 pull challenge image 用）─────────────
+# CTFd host 的內網 IP（與 k3s 節點同子網）
+# 空字串=不設定 registries.yaml（k3s 只能用公開 image）
+# registry_ip = "192.168.234.217"
