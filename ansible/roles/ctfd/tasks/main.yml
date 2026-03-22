@@ -117,6 +117,26 @@
     version: "{{ ctfd_chall_manager_version }}"
     force: yes
 
+# ── Patch: 玩家 Destroy 改為異步（不等 chall-manager 完成刪除）───
+# 原始行為：同步等待 delete_instance 完成（VM 題 ~11s）
+# Patch 後：背景執行 delete_instance，立即回傳 200（<1s，與 timeout 到期行為一致）
+# 每次 git clone 後重新套用，上游更新時 regex 匹配不到只會跳過不會壞
+- name: Patch ctfd-chall-manager plugin — 異步 destroy（加速 VM 題切題體驗）
+  shell: |
+    FILE="{{ ctfd_deploy_dir }}/CTFd/plugins/ctfd_chall_manager/api/instance.py"
+    # 檢查是否已 patch（避免重複套用）
+    if grep -q 'threading.Thread.*delete_instance' "$FILE"; then
+      echo "already patched"
+      exit 0
+    fi
+    # 將同步 delete_instance 改為 threading 背景執行
+    sed -i 's|delete_instance(challenge_id, source_id)|import threading; threading.Thread(target=delete_instance, args=(challenge_id, source_id), daemon=True).start()|' "$FILE"
+    echo "patched"
+  args:
+    executable: /bin/bash
+  register: patch_result
+  changed_when: "'patched' in patch_result.stdout and 'already' not in patch_result.stdout"
+
 - name: 確保不存在幽靈資料夾（ctfd-chall-manager，連字號版本）
   file:
     path: "{{ ctfd_deploy_dir }}/CTFd/plugins/ctfd-chall-manager"
