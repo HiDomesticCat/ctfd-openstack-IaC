@@ -142,17 +142,12 @@
     state: absent
 
 # ── 啟動 CTFd ─────────────────────────────────────────────
-- name: 啟動 CTFd（含重 build，版本變更時）
+# patch 改了 plugin 原始碼，必須 --build 重建 image 才會生效
+# --force-recreate 確保容器使用新 image
+- name: 啟動 CTFd（含 build，確保 patch 生效）
   shell: |
     cd {{ ctfd_deploy_dir }}
-    docker compose up -d --build
-  when: ctfd_needs_rebuild
-
-- name: 啟動 CTFd（無版本變更，直接啟動）
-  shell: |
-    cd {{ ctfd_deploy_dir }}
-    docker compose up -d
-  when: not ctfd_needs_rebuild
+    docker compose up -d --build --force-recreate ctfd
 
 # ── 等待 CTFd 健康 ────────────────────────────────────────
 - name: 等待 CTFd HTTP 回應（最多 180 秒）
