@@ -54,6 +54,9 @@ services:
       KUBECONFIG: "{{ k3s_kubeconfig_container_path | default('/kubeconfig/k3s.yaml') }}"
 {% endif %}
 
+      # k8s-pod image registry prefix（challenge.yml 只需寫 image 名稱）
+      CHALLENGE_REGISTRY: "{{ ctfd_internal_ip }}:{{ registry_port }}"
+
       # Pulumi local backend（不需要 Pulumi Cloud 帳號）
       PULUMI_BACKEND_URL: "file:///pulumi-state"
       # ⚠️  SECURITY: 空字串 passphrase 表示 pulumi-state volume 未加密。

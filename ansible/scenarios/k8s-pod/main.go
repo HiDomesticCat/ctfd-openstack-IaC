@@ -8,6 +8,8 @@
 //
 // additional 支援的 key（可在 CTFd Advanced 區塊設定）：
 //   image          靶機 container image（預設 ubuntu:22.04）
+//                  若 CHALLENGE_REGISTRY 已設定且 image 不含 registry prefix，
+//                  會自動加上 prefix（如 "exchange:latest" → "192.168.x.x:5000/exchange:latest"）
 //   port           靶機服務 port（預設 22）
 //   command        覆蓋 entrypoint（逗號分隔，如 "sleep,infinity"）
 //   base_flag      flag 衍生基礎值
@@ -55,7 +57,9 @@ func main() {
 		// ── 題目設定（additional 優先，fallback 到環境變數）────
 		baseFlag := configOrEnv(req, "base_flag", "CHALLENGE_BASE_FLAG", "default_base_flag")
 		flagPrefix := configOrEnv(req, "flag_prefix", "CHALLENGE_FLAG_PREFIX", "CTF")
-		image := configOrEnv(req, "image", "CHALLENGE_IMAGE", "ubuntu:22.04")
+		rawImage := configOrEnv(req, "image", "CHALLENGE_IMAGE", "ubuntu:22.04")
+		registry := envOrDefault("CHALLENGE_REGISTRY", "")
+		image := resolveImage(rawImage, registry)
 		challengePortStr := configOrEnv(req, "port", "CHALLENGE_PORT", "22")
 
 		connTpl := configOrEnv(req, "connection_info", "", "nc {ip} {port}")
@@ -251,4 +255,21 @@ func envOrDefault(key, def string) string {
 		return v
 	}
 	return def
+}
+
+// resolveImage 自動加 registry prefix。
+// 如果 image 已經含 "/" 前面有 "." 或 ":"（代表已經是完整 registry 路徑），就原樣返回。
+// 否則加上 CHALLENGE_REGISTRY prefix，讓 challenge.yml 只需寫 "exchange:latest"。
+func resolveImage(image, registry string) string {
+	if registry == "" {
+		return image
+	}
+	// 已經有 registry prefix（如 docker.io/..., 192.168.x.x:5000/...）
+	if i := strings.IndexByte(image, '/'); i > 0 {
+		prefix := image[:i]
+		if strings.ContainsAny(prefix, ".:") {
+			return image
+		}
+	}
+	return strings.TrimRight(registry, "/") + "/" + image
 }

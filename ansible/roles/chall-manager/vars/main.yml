@@ -15,6 +15,8 @@ chall_manager_scenarios_dir: "/opt/chall-manager/scenarios"
 # 本機 Docker Registry（供 chall-manager 存取 scenario OCI artifact）
 registry_port: 5000
 registry_host: "localhost"
+# CTFd 主機內網 IP（k3s 節點 pull image 用，由 ansible fact 自動取得）
+ctfd_internal_ip: "{{ ansible_default_ipv4.address }}"
 registry_url: "{{ registry_host }}:{{ registry_port }}"
 # ✅ chall-manager 容器內要用 Docker service name（不是 localhost）
 # localhost 在容器內指向容器本身，registry 是 docker-compose 定義的 service name
