@@ -1,0 +1,21 @@
+# challenges/exchange/challenge.yml
+name: "Exchange Station"
+category: "Web"
+description: |
+  A web challenge about currency exchange.
+value: 100
+type: dynamic_iac
+state: visible
+
+scenario: k8s-pod
+timeout: 3600
+pool_min: 1
+pool_max: 3
+
+additional:
+  image: "exchange:latest"
+  port: "80"
+  base_flag: "exchange_flag"
+  memory_limit: "512Mi"
+  connection_info: "http://{ip}:{port}"
+

@@ -1,6 +1,0 @@
-source_id,boot_api_ms,service_ready_ms,total_ms,connection_info,status
-stress_1,53732,62,53794,http://10.0.2.185:8080,OK
-stress_2,55848,56,55904,http://10.0.2.177:8080,OK
-stress_4,58076,68,58144,http://10.0.2.195:8080,OK
-stress_3,61562,53,61615,http://10.0.2.183:8080,OK
-stress_5,61719,53,61772,http://10.0.2.170:8080,OK

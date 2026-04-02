@@ -1,11 +1,6 @@
 # 運維管理的基礎設施預設值
 # registration script 會將這些值合併到每道題目的 additional 中
 # 題目的 challenge.yml 中的 additional 會覆蓋這裡的值
-#
-# 取得 UUID：
-#   cd platform && tofu output    → image_ids, network_id
-#   cd ctfd     && tofu output    → network_id
-#   openstack security group list → security_group_id
 
 # ── scenario 預設名稱（展開為 registry:5000/<scenario>:latest）──
 scenario_registry: "registry:5000"
@@ -13,13 +8,15 @@ scenario_tag: "latest"
 
 # ── openstack-vm 預設值 ─────────────────────────────────────
 openstack-vm:
-  network_id: "60c5b2f9-fdac-46db-a027-eca1f4fc11ed"  # ctfd-network
-  flavor: "general.small"
-  fip_pool: "public"
+  network_id: "3209808a-07ac-4584-ac74-d4e70e55c46a"  # shared-public2
+  flavor: "basic-1c2g"
+  fip_pool: "public3"
+  use_fip: "false"
   flag_prefix: "CTF"
   flag_path: "/opt/ctf/flag.txt"
-  security_group_id: "59a3c700-4d72-4c17-b1b4-ae550f6927a9"  # ctf-allow-all（省 ~3-5s）
-  # fip_address: ""                  # 選填：預分配 FIP（省 ~2-3s）
+  security_group_id: "3534e369-e6e3-4644-a889-b46c77f3944e"  # ctf-allow-all
+  boot_from_volume: "true"
+  volume_size: "10"
 
 # ── k8s-pod 預設值 ──────────────────────────────────────────
 k8s-pod:

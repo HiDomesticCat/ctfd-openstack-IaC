@@ -1,2 +1,0 @@
-source_id,boot_api_ms,service_ready_ms,total_ms,connection_info,status
-stress_1,42246,55,42301,http://10.0.2.189:8080,OK

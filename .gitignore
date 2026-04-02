@@ -75,6 +75,10 @@ packer/packer_cache/
 # direnv 快取（nix develop 的 symlink 樹）
 .direnv/
 
+# ── 壓力測試結果 ──────────────────────────────────────────
+# 原始數據、logs、圖表等不進 git（僅保留腳本）
+stress-test-results/
+
 # ── 系統 / 編輯器 ─────────────────────────────────────────
 .DS_Store
 .idea/

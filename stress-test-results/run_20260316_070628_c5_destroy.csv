@@ -1,6 +1,0 @@
-source_id,delete_api_ms,destroy_complete_ms,total_destroy_ms,status
-stress_2,21753,482,22235,OK
-stress_4,22656,493,23149,OK
-stress_3,23161,472,23633,OK
-stress_5,23176,481,23657,OK
-stress_1,23204,482,23686,OK
