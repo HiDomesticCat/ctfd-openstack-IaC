@@ -25,6 +25,14 @@
 
 timezone: ${timezone}
 
+# ── DNS 設定 ──────────────────────────────────────────────
+manage_resolv_conf: true
+resolv_conf:
+  nameservers:
+%{ for ns in dns_nameservers ~}
+    - ${ns}
+%{ endfor ~}
+
 package_update: true
 package_upgrade: true
 

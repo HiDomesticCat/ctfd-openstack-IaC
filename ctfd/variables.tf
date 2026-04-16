@@ -121,15 +121,16 @@ variable "flavor_name" {
   default     = "general.medium"
 }
 
+variable "use_floating_ip" {
+  description = "是否配置 Floating IP（false=僅使用 router SNAT 聯外，無外部 IP 連入）"
+  type        = bool
+  default     = true
+}
+
 variable "floating_ip_pool" {
-  description = "Floating IP 所在的外部網路名稱"
+  description = "Floating IP 所在的外部網路名稱（use_floating_ip=true 時使用）"
   type        = string
   default     = "public"
-
-  validation {
-    condition     = length(var.floating_ip_pool) > 0
-    error_message = "floating_ip_pool 不能為空。"
-  }
 }
 
 # ── Management Network ────────────────────────────────────

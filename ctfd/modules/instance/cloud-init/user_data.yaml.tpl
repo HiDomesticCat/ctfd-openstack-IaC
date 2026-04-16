@@ -4,6 +4,14 @@
 
 timezone: ${timezone}
 
+# ── DNS 設定（確保 SNAT 模式下 apt/docker 能解析域名）────────
+manage_resolv_conf: true
+resolv_conf:
+  nameservers:
+%{ for ns in dns_nameservers ~}
+    - ${ns}
+%{ endfor ~}
+
 # 更新套件清單並升級系統
 package_update: true
 package_upgrade: true
@@ -40,6 +48,20 @@ write_files:
 %{ endif ~}
 
 runcmd:
+  # DNS — 確保 systemd-resolved 使用正確的 DNS
+  - mkdir -p /etc/systemd/resolved.conf.d
+  - |
+    cat > /etc/systemd/resolved.conf.d/dns.conf << 'DNSEOF'
+    [Resolve]
+%{ for ns in dns_nameservers ~}
+    DNS=${ns}
+%{ endfor ~}
+    DNSEOF
+  - systemctl restart systemd-resolved
+  # Docker — daemon 層級 DNS（build 時也生效）
+  - mkdir -p /etc/docker
+  - |
+    echo '{"dns": [${join(", ", [for ns in dns_nameservers : "\"${ns}\""])}]}' > /etc/docker/daemon.json
   # Docker
   - systemctl enable docker
   - systemctl start docker

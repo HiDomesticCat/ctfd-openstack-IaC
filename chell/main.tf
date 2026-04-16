@@ -110,6 +110,7 @@ module "k3s" {
   boot_from_volume = var.boot_from_volume
   volume_size      = var.volume_size
   registry_ip      = var.registry_ip
+  dns_nameservers  = var.dns_nameservers
 
   depends_on = [module.network, module.secgroup]
 }

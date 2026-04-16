@@ -87,6 +87,7 @@ module "instance" {
   keypair_name     = module.keypair.keypair_name
   secgroup_name    = module.secgroup.secgroup_name
   network_id       = local.network_id
+  use_floating_ip  = var.use_floating_ip
   floating_ip_pool = var.floating_ip_pool
 
   # Volume boot（flavor disk=0 的環境必須設 true）
@@ -98,8 +99,9 @@ module "instance" {
   mgmt_routes     = var.mgmt_routes
 
   # Cloud-init 設定
-  timezone   = var.timezone
-  deploy_dir = var.deploy_dir
+  timezone        = var.timezone
+  deploy_dir      = var.deploy_dir
+  dns_nameservers = var.dns_nameservers
 
   # 自建模式需等 network + router 完全就緒；shared 模式不需要
   depends_on = [module.network]
@@ -122,7 +124,7 @@ resource "local_file" "challenge_ids" {
 # 自動產生 Ansible inventory
 resource "local_file" "ansible_inventory" {
   content = templatefile("${path.module}/templates/inventory.tpl", {
-    ctfd_ip         = module.instance.floating_ip
+    ctfd_ip         = coalesce(module.instance.floating_ip, module.instance.internal_ip)
     ssh_private_key = trimsuffix(var.public_key_path, ".pub")
   })
   filename        = "${path.module}/../ansible/inventory/hosts.ini"

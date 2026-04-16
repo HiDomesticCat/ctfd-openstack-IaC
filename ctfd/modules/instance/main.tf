@@ -51,26 +51,30 @@ resource "openstack_compute_instance_v2" "this" {
 
   # Cloud-init：VM 第一次啟動時自動執行
   user_data = templatefile("${path.module}/cloud-init/user_data.yaml.tpl", {
-    timezone    = var.timezone
-    deploy_dir  = var.deploy_dir
-    mgmt_ip     = local.mgmt_ip
-    mgmt_routes = var.mgmt_routes
+    timezone        = var.timezone
+    deploy_dir      = var.deploy_dir
+    mgmt_ip         = local.mgmt_ip
+    mgmt_routes     = var.mgmt_routes
+    dns_nameservers = var.dns_nameservers
   })
 }
 
-# 申請 Floating IP
+# 申請 Floating IP（可選）
 resource "openstack_networking_floatingip_v2" "this" {
-  pool = var.floating_ip_pool
+  count = var.use_floating_ip ? 1 : 0
+  pool  = var.floating_ip_pool
 }
 
 # 取得 VM 的 Port（用於綁定 Floating IP）
 data "openstack_networking_port_v2" "this" {
+  count      = var.use_floating_ip ? 1 : 0
   device_id  = openstack_compute_instance_v2.this.id
   network_id = var.network_id
 }
 
 # 將 Floating IP 綁定到 VM Port
 resource "openstack_networking_floatingip_associate_v2" "this" {
-  floating_ip = openstack_networking_floatingip_v2.this.address
-  port_id     = data.openstack_networking_port_v2.this.id
+  count       = var.use_floating_ip ? 1 : 0
+  floating_ip = openstack_networking_floatingip_v2.this[0].address
+  port_id     = data.openstack_networking_port_v2.this[0].id
 }

@@ -101,3 +101,9 @@ variable "registry_ip" {
   type        = string
   default     = ""
 }
+
+variable "dns_nameservers" {
+  description = "DNS 伺服器清單（cloud-init resolv.conf 使用）"
+  type        = list(string)
+  default     = ["8.8.8.8", "8.8.4.4"]
+}

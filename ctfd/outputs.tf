@@ -1,18 +1,18 @@
 # ctfd/outputs.tf
 
 output "floating_ip" {
-  description = "CTFd 對外 Floating IP"
+  description = "CTFd 對外 Floating IP（use_floating_ip=false 時為 null）"
   value       = module.instance.floating_ip
 }
 
 output "ctfd_url" {
   description = "CTFd 存取網址（HTTP）"
-  value       = "http://${module.instance.floating_ip}:${var.ctfd_port}"
+  value       = "http://${coalesce(module.instance.floating_ip, module.instance.internal_ip)}:${var.ctfd_port}"
 }
 
 output "ssh_command" {
   description = "SSH 連線指令"
-  value       = "ssh ubuntu@${module.instance.floating_ip}"
+  value       = "ssh ubuntu@${coalesce(module.instance.floating_ip, module.instance.internal_ip)}"
 }
 
 output "internal_ip" {

@@ -11,6 +11,6 @@ output "internal_ip" {
 }
 
 output "floating_ip" {
-  description = "CTFd 對外 Floating IP"
-  value       = openstack_networking_floatingip_v2.this.address
+  description = "CTFd 對外 Floating IP（use_floating_ip=false 時為 null）"
+  value       = var.use_floating_ip ? openstack_networking_floatingip_v2.this[0].address : null
 }

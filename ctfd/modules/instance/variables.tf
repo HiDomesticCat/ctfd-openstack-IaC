@@ -37,15 +37,16 @@ variable "network_id" {
   type        = string
 }
 
+variable "use_floating_ip" {
+  description = "是否配置 Floating IP（false=僅 SNAT 聯外）"
+  type        = bool
+  default     = true
+}
+
 variable "floating_ip_pool" {
-  description = "Floating IP 所在的外部網路名稱（例如 public）"
+  description = "Floating IP 所在的外部網路名稱（use_floating_ip=true 時使用）"
   type        = string
   default     = "public"
-
-  validation {
-    condition     = length(var.floating_ip_pool) > 0
-    error_message = "floating_ip_pool 不能為空。"
-  }
 }
 
 # ── Management Network（OpenStack API 可達性）────────────
@@ -77,6 +78,14 @@ variable "volume_size" {
   description = "Volume 大小（GB），boot_from_volume=true 時使用"
   type        = number
   default     = 20
+}
+
+# ── DNS ────────────────────────────────────────────────────
+
+variable "dns_nameservers" {
+  description = "DNS 伺服器清單（cloud-init + Docker daemon 使用）"
+  type        = list(string)
+  default     = ["8.8.8.8", "8.8.4.4"]
 }
 
 # ── Cloud-init ─────────────────────────────────────────────
