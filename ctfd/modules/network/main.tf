@@ -4,6 +4,7 @@
 resource "openstack_networking_network_v2" "this" {
   name           = var.network_name
   admin_state_up = true
+  mtu            = var.network_mtu
 }
 
 # 內部子網路：開 DHCP，讓 VM 自動取得 IP

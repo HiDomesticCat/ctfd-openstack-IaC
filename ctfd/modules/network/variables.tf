@@ -29,6 +29,12 @@ variable "dns_nameservers" {
   default     = ["8.8.8.8", "8.8.4.4"]
 }
 
+variable "network_mtu" {
+  description = "網路 MTU（VXLAN overlay 預設 1450，校園網路受限時需降低）"
+  type        = number
+  default     = 1450
+}
+
 variable "router_name" {
   description = "Router 名稱"
   type        = string

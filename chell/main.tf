@@ -52,6 +52,7 @@ module "network" {
   subnet_cidr         = var.k3s_subnet_cidr
   master_fixed_ip     = var.master_fixed_ip
   dns_nameservers     = var.dns_nameservers
+  network_mtu         = var.network_mtu
   router_name         = "chell-router"
   external_network_id = var.external_network_id
 }

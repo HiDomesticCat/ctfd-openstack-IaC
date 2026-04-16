@@ -40,6 +40,7 @@ module "network" {
   subnet_name         = "ctfd-subnet"
   subnet_cidr         = var.internal_subnet_cidr
   dns_nameservers     = var.dns_nameservers
+  network_mtu         = var.network_mtu
   router_name         = "ctfd-router"
   external_network_id = var.external_network_id
 

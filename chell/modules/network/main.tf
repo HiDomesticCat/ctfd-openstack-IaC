@@ -5,6 +5,7 @@
 resource "openstack_networking_network_v2" "this" {
   name           = var.network_name
   admin_state_up = true
+  mtu            = var.network_mtu
 }
 
 # k3s 子網路

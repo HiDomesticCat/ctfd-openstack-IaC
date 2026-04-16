@@ -80,6 +80,12 @@ variable "dns_nameservers" {
   default     = ["8.8.8.8", "8.8.4.4"]
 }
 
+variable "network_mtu" {
+  description = "內部網路 MTU（VXLAN overlay 預設 1450，上游網路受限時需降低）"
+  type        = number
+  default     = 1450
+}
+
 # ── Security ───────────────────────────────────────────────
 variable "ssh_allowed_cidr" {
   description = "允許 SSH/kubectl 管理的來源 CIDR（建議限制為管理 IP）"

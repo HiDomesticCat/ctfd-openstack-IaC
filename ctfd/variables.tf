@@ -69,6 +69,12 @@ variable "dns_nameservers" {
   default     = ["8.8.8.8", "8.8.4.4"]
 }
 
+variable "network_mtu" {
+  description = "內部網路 MTU（VXLAN overlay 預設 1450，上游網路受限時需降低，如校園 MTU=1024 時設 974）"
+  type        = number
+  default     = 1450
+}
+
 # ── Security Group ─────────────────────────────────────────
 variable "ssh_allowed_cidr" {
   description = "允許 SSH 連入的來源 CIDR（建議限制為管理 IP，避免全網際網路暴露）"

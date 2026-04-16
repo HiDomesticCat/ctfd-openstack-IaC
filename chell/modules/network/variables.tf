@@ -26,6 +26,12 @@ variable "dns_nameservers" {
   default     = ["8.8.8.8", "8.8.4.4"]
 }
 
+variable "network_mtu" {
+  description = "網路 MTU"
+  type        = number
+  default     = 1450
+}
+
 variable "router_name" {
   description = "Router 名稱"
   type        = string
