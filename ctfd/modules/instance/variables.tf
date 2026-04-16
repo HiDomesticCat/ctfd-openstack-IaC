@@ -88,6 +88,12 @@ variable "dns_nameservers" {
   default     = ["8.8.8.8", "8.8.4.4"]
 }
 
+variable "network_mtu" {
+  description = "網路 MTU（Docker daemon MTU = network_mtu - 40）"
+  type        = number
+  default     = 1450
+}
+
 # ── Cloud-init ─────────────────────────────────────────────
 
 variable "timezone" {

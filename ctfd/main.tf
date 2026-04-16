@@ -103,6 +103,7 @@ module "instance" {
   timezone        = var.timezone
   deploy_dir      = var.deploy_dir
   dns_nameservers = var.dns_nameservers
+  network_mtu     = var.network_mtu
 
   # 自建模式需等 network + router 完全就緒；shared 模式不需要
   depends_on = [module.network]

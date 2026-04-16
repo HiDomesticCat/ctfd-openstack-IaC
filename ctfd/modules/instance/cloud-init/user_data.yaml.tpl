@@ -37,7 +37,7 @@ write_files:
     permissions: '0644'
   - path: /etc/docker/daemon.json
     content: |
-      {"dns": [${join(", ", [for ns in dns_nameservers : "\"${ns}\""])}]}
+      {"dns": [${join(", ", [for ns in dns_nameservers : "\"${ns}\""])}], "mtu": ${network_mtu - 40}}
     permissions: '0644'
 %{ if mgmt_ip != "" ~}
   - path: /etc/netplan/99-mgmt.yaml

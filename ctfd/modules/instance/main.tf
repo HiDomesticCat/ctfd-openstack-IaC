@@ -56,6 +56,7 @@ resource "openstack_compute_instance_v2" "this" {
     mgmt_ip         = local.mgmt_ip
     mgmt_routes     = var.mgmt_routes
     dns_nameservers = var.dns_nameservers
+    network_mtu     = var.network_mtu
   })
 }
 
