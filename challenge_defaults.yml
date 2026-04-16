@@ -7,15 +7,18 @@ scenario_registry: "registry:5000"
 scenario_tag: "latest"
 
 # ── openstack-vm 預設值 ─────────────────────────────────────
+# ⚠️ network_id 和 security_group_id 為部署後產生的 UUID，必須從 tofu output 更新：
+#   cd ctfd && tofu output network_id
+#   cd ctfd && tofu output challenge_secgroup_ids
 openstack-vm:
-  network_id: "3209808a-07ac-4584-ac74-d4e70e55c46a"  # shared-public2
-  flavor: "basic-1c2g"
-  fip_pool: "public3"
+  network_id: "REPLACE_FROM_TOFU_OUTPUT"          # ctfd tofu output: network_id
+  flavor: "general.small"
+  fip_pool: "public"
   use_fip: "false"
   flag_prefix: "CTF"
   flag_path: "/opt/ctf/flag.txt"
-  security_group_id: "3534e369-e6e3-4644-a889-b46c77f3944e"  # ctf-allow-all
-  boot_from_volume: "true"
+  security_group_id: "REPLACE_FROM_TOFU_OUTPUT"   # ctfd tofu output: challenge_secgroup_ids.allow_all
+  boot_from_volume: "false"
   volume_size: "10"
 
 # ── k8s-pod 預設值 ──────────────────────────────────────────

@@ -17,7 +17,7 @@ Challenge as Code — CTFd 題目自動註冊
   python3 scripts/register-challenges.py --force
 
 環境變數：
-  CTFD_URL    CTFd 位址（如 http://10.0.2.150:8000）
+  CTFD_URL    CTFd 位址（如 http://<CTFD_FLOATING_IP>:8000）
   CTFD_TOKEN  CTFd API Token（Settings > Access Tokens）
 """
 

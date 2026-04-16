@@ -27,9 +27,19 @@ packages:
   # docker-buildx-plugin 需從 Docker 官方 apt 倉庫安裝
   # 由 Ansible playbook 負責加入倉庫並安裝
 
-%{ if mgmt_ip != "" ~}
-# ── 管理網卡 netplan（讓 VM 能連到 OpenStack API）──────────
 write_files:
+  - path: /etc/systemd/resolved.conf.d/dns.conf
+    content: |
+      [Resolve]
+%{ for ns in dns_nameservers ~}
+      DNS=${ns}
+%{ endfor ~}
+    permissions: '0644'
+  - path: /etc/docker/daemon.json
+    content: |
+      {"dns": [${join(", ", [for ns in dns_nameservers : "\"${ns}\""])}]}
+    permissions: '0644'
+%{ if mgmt_ip != "" ~}
   - path: /etc/netplan/99-mgmt.yaml
     content: |
       network:
@@ -48,20 +58,7 @@ write_files:
 %{ endif ~}
 
 runcmd:
-  # DNS — 確保 systemd-resolved 使用正確的 DNS
-  - mkdir -p /etc/systemd/resolved.conf.d
-  - |
-    cat > /etc/systemd/resolved.conf.d/dns.conf << 'DNSEOF'
-    [Resolve]
-%{ for ns in dns_nameservers ~}
-    DNS=${ns}
-%{ endfor ~}
-    DNSEOF
   - systemctl restart systemd-resolved
-  # Docker — daemon 層級 DNS（build 時也生效）
-  - mkdir -p /etc/docker
-  - |
-    echo '{"dns": [${join(", ", [for ns in dns_nameservers : "\"${ns}\""])}]}' > /etc/docker/daemon.json
   # Docker
   - systemctl enable docker
   - systemctl start docker

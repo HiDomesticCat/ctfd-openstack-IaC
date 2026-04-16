@@ -20,7 +20,7 @@ CHALLENGE_ID="${2:-8}"
 
 # chall-manager 在 CTFd 主機上以 Docker 運行，只綁定 127.0.0.1:8080
 # 需透過 SSH 存取
-CM_HOST="${CM_HOST:-10.0.2.181}"
+CM_HOST="${CM_HOST:?ERROR: CM_HOST not set. Export CM_HOST=<ctfd-floating-ip>}"
 CM_SSH_USER="${CM_SSH_USER:-ubuntu}"
 
 RESULTS_DIR="$PROJECT_ROOT/stress-test-results"
