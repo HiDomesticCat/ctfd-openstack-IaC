@@ -47,7 +47,7 @@ pip install -r requirements.txt
 # 設定環境變數
 export PULUMI_BACKEND_URL="file:///tmp/pulumi-test"
 export PULUMI_CONFIG_PASSPHRASE=""
-export OS_AUTH_URL="http://192.168.15.200:5000/v3"
+export OS_AUTH_URL="http://192.168.50.200:5000/v3"
 export OS_PROJECT_NAME="ctfd"
 export OS_USERNAME="ctfd-deployer"
 export OS_PASSWORD="your-password"

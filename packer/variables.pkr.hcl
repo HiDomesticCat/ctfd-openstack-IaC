@@ -5,7 +5,7 @@
 # ── OpenStack 認證 ────────────────────────────────────────
 variable "openstack_auth_url" {
   type        = string
-  description = "OpenStack Keystone endpoint（如 http://192.168.15.200:5000/v3）"
+  description = "OpenStack Keystone endpoint（如 http://192.168.50.200:5000/v3）"
 }
 
 variable "openstack_username" {
