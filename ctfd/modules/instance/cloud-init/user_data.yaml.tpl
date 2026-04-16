@@ -59,6 +59,11 @@ write_files:
 
 runcmd:
   - systemctl restart systemd-resolved
+  # TCP MSS clamping — 確保 HTTPS 大封包不被上游 gateway 丟棄
+  # VXLAN overlay + 受限校園 MTU 環境下必要
+  - iptables -t mangle -A POSTROUTING -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu
+  - mkdir -p /etc/iptables
+  - iptables-save > /etc/iptables/rules.v4
   # Docker
   - systemctl enable docker
   - systemctl start docker

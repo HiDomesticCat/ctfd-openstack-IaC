@@ -107,6 +107,8 @@ write_files:
       echo "    kubeconfig  : /home/ubuntu/.kube/config"
 
 runcmd:
+  # TCP MSS clamping — VXLAN overlay + 受限 MTU 環境
+  - iptables -t mangle -A POSTROUTING -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu
   - /opt/k3s-server-init.sh
 
 final_message: "k3s master ready. API=https://${master_floating_ip}:6443, uptime=$${UPTIME}s"

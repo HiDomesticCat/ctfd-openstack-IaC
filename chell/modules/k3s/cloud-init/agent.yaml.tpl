@@ -75,6 +75,8 @@ write_files:
       echo "==> [$(date)] k3s agent joined cluster successfully."
 
 runcmd:
+  # TCP MSS clamping — VXLAN overlay + 受限 MTU 環境
+  - iptables -t mangle -A POSTROUTING -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu
   - /opt/k3s-agent-init.sh
 
 final_message: "k3s agent joined cluster (master=${master_fixed_ip}), uptime=$${UPTIME}s"
