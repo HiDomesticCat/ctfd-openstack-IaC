@@ -142,21 +142,31 @@
     state: absent
 
 # ── 啟動 CTFd ─────────────────────────────────────────────
-# patch 改了 plugin 原始碼，必須 --build 重建 image 才會生效
-# --force-recreate 確保容器使用新 image
-- name: 啟動 CTFd（含 build，確保 patch 生效）
+# 版本變更或首次部署：build image + 啟動所有 service
+# 首次 build 可能需要 15+ 分鐘（pip install），使用 async 避免 SSH timeout
+- name: Build + 啟動所有 CTFd service（版本變更時）
   shell: |
     cd {{ ctfd_deploy_dir }}
-    docker compose up -d --build --force-recreate ctfd
+    docker compose up -d --build --force-recreate
+  async: 1800
+  poll: 30
+  when: ctfd_needs_rebuild
+
+# 後續執行：只確保所有 service running（不重建）
+- name: 確保所有 CTFd service 正在執行（無需重建時）
+  shell: |
+    cd {{ ctfd_deploy_dir }}
+    docker compose up -d
+  when: not ctfd_needs_rebuild
 
 # ── 等待 CTFd 健康 ────────────────────────────────────────
-- name: 等待 CTFd HTTP 回應（最多 180 秒）
+- name: 等待 CTFd HTTP 回應（最多 300 秒）
   uri:
     url: "http://127.0.0.1:8000"
     status_code: [200, 302]
   register: ctfd_health
   until: ctfd_health.status in [200, 302]
-  retries: 36
+  retries: 60
   delay: 5
 
 # ── 寫入版本記錄 ──────────────────────────────────────────
