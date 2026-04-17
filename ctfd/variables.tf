@@ -84,7 +84,7 @@ variable "dns_nameservers" {
 }
 
 variable "network_mtu" {
-  description = "內部網路 MTU（VXLAN overlay 預設 1450，上游網路受限時需降低，如校園 MTU=1024 時設 974）"
+  description = "內部網路 MTU。textbook VXLAN 是 1500-50=1450；本叢集實測 path MTU ~928，請設 900（保留 28 bytes 餘裕）。974 不夠，會讓 HTTPS 大封包 RST。"
   type        = number
   default     = 1450
 }

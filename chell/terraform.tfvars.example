@@ -27,6 +27,10 @@ public_key_path = "/root/.ssh/id_rsa.pub"
 k3s_subnet_cidr = "192.168.200.0/24"
 master_fixed_ip = "192.168.200.10"
 
+# 此叢集 path MTU 實測 ~928，請設 900（28 bytes 餘裕）。default=1450
+# 是 textbook VXLAN 值，會讓 HTTPS 大封包 RST。對齊 ctfd/ 與 gamma4-lab-infra。
+network_mtu = 900
+
 # ── Instance ───────────────────────────────────────────────
 master_flavor    = "general.medium"
 worker_flavor    = "general.medium"

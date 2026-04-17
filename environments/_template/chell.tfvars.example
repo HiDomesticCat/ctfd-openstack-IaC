@@ -7,6 +7,11 @@ openstack_cloud = "ctfd"
 use_shared_network  = true
 shared_network_name = "shared-public3"
 
+# ── Network MTU ──────────────────────────────────────────────
+# 此叢集 path MTU 實測 ~928，請設 900。default=1450 是 textbook VXLAN 值，
+# 會讓 HTTPS 大封包 RST。對齊 ctfd/ 與 gamma4-lab-infra。
+network_mtu = 900
+
 # ── Instance ─────────────────────────────────────────────────
 image_id         = "<FROM_PLATFORM_OUTPUT>"
 master_flavor    = "basic-2c4g"
