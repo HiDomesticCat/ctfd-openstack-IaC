@@ -25,3 +25,20 @@ output "ctfd_credentials" {
   sensitive   = true
   value       = module.ctfd_project.credentials
 }
+
+# ── 玩家↔題目共享網段 ──────────────────────────────────────
+
+output "challenge_network_id" {
+  description = "玩家↔題目共享網段 ID（admin 創、RBAC share 給 ctfd-deployer）"
+  value       = module.challenge_network.network_id
+}
+
+output "challenge_network_name" {
+  description = "玩家↔題目共享網段名稱（chell, ctfd, gamma4-IaC 用 data source 引用）"
+  value       = module.challenge_network.network_name
+}
+
+output "challenge_network_cidr" {
+  description = "玩家↔題目 CIDR（給 secgroup rule source 用，例如 Caldera agent ingress）"
+  value       = module.challenge_network.cidr
+}

@@ -149,6 +149,31 @@ variable "images" {
   }))
 }
 
+# ── 玩家↔題目共享網段 ──────────────────────────────────────
+
+variable "challenge_network_name" {
+  description = "玩家↔題目共享網段名稱（chell, ctfd, gamma4-IaC 用 data source 引用）"
+  type        = string
+  default     = "challenge-net"
+}
+
+variable "challenge_network_cidr" {
+  description = "玩家↔題目 CIDR。連續編號：50 管理、77 gamma4 內、78 player↔challenge、100 ctfd web、200 chell 控制面"
+  type        = string
+  default     = "192.168.78.0/24"
+
+  validation {
+    condition     = can(cidrhost(var.challenge_network_cidr, 0))
+    error_message = "必須是合法的 CIDR 格式。"
+  }
+}
+
+variable "challenge_network_mtu" {
+  description = "玩家↔題目 MTU。本叢集 path MTU ~928，900 是經驗安全值。"
+  type        = number
+  default     = 900
+}
+
 # ── Quota ────────────────────────────────────────────────────
 
 variable "quota" {

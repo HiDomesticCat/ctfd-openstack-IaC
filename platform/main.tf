@@ -78,3 +78,21 @@ module "ctfd_project" {
   enable_quota        = true
   quota               = var.quota
 }
+
+# ── 玩家↔題目共享網段 ──────────────────────────────────────
+# Admin 創、RBAC share 給 ctfd-deployer。三個層共用：
+#   - chell/ k3s worker 第二個 port（NodePort 從這聽）
+#   - ctfd/ openstack-vm scenario 預設網段
+#   - gamma4-lab-infra/ 研究 VM 第二個 port（Caldera 直接打題目）
+# 詳見 modules/challenge_network/main.tf
+
+module "challenge_network" {
+  source = "./modules/challenge_network"
+
+  network_name      = var.challenge_network_name
+  subnet_name       = "${var.challenge_network_name}-subnet"
+  cidr              = var.challenge_network_cidr
+  mtu               = var.challenge_network_mtu
+  dns_nameservers   = var.dns_nameservers
+  target_project_id = module.ctfd_project.project_id
+}
