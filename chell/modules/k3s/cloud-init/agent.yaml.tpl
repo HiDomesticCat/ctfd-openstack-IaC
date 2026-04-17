@@ -73,10 +73,20 @@ write_files:
       export INSTALL_K3S_VERSION="${k3s_version}"
       %{~ endif }
 
+      # Pin k3s INTERNAL-IP to the primary (default-route) interface.
+      # Without this, when the worker has a second NIC on challenge-net,
+      # k3s races on DHCP and may pick the challenge-net IP as INTERNAL-IP,
+      # causing cross-node pod traffic to tunnel via challenge-net instead
+      # of chell-network's control plane.
+      PRIMARY_IF=$(ip route show default | awk '{print $5; exit}')
+      NODE_IP=$(ip -4 -o addr show "$PRIMARY_IF" | awk '{print $4}' | cut -d/ -f1)
+      echo "    node-ip (auto-detected): $NODE_IP (on $PRIMARY_IF)"
+
       curl -sfL https://get.k3s.io | \
         K3S_URL="https://${master_fixed_ip}:6443" \
         K3S_TOKEN="${k3s_token}" \
-        sh -s - agent
+        sh -s - agent \
+          --node-ip "$NODE_IP"
 
       echo "==> [$(date)] k3s agent joined cluster successfully."
 
