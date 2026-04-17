@@ -113,3 +113,9 @@ variable "challenge_network_id" {
   type        = string
   default     = ""
 }
+
+variable "network_mtu" {
+  description = "VM 主介面 MTU。在 cloud-init bootcmd 顯式設 ip link mtu，不靠 DHCP（DHCP lease 不會跟著網段 in-place update 同步）。本叢集實測 path MTU ~928，請設 900。"
+  type        = number
+  default     = 1450
+}

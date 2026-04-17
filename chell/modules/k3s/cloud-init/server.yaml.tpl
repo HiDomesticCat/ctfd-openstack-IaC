@@ -33,6 +33,14 @@ resolv_conf:
     - ${ns}
 %{ endfor ~}
 
+# ── MTU + MSS clamp（必須在 apt 前） ─────────────────────
+# bootcmd 每次 boot 都跑（idempotent: -C 檢查 + -A 補上）。
+# 不靠 DHCP 派 MTU — DHCP lease 不會跟著網段 in-place update。
+# apt over HTTPS 在 path MTU ~928 的環境會 RST，必須在 packages 前修。
+bootcmd:
+  - 'PRIMARY_IF=$(ip route show default | awk "{print \$5; exit}"); ip link set "$PRIMARY_IF" mtu ${network_mtu}'
+  - 'iptables -t mangle -C POSTROUTING -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu 2>/dev/null || iptables -t mangle -A POSTROUTING -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu'
+
 package_update: true
 package_upgrade: true
 
@@ -107,8 +115,7 @@ write_files:
       echo "    kubeconfig  : /home/ubuntu/.kube/config"
 
 runcmd:
-  # TCP MSS clamping — VXLAN overlay + 受限 MTU 環境
-  - iptables -t mangle -A POSTROUTING -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu
+  # MTU + MSS 已在 bootcmd 套用（每次 boot 自動 idempotent 套）
   - /opt/k3s-server-init.sh
 
 final_message: "k3s master ready. API=https://${master_floating_ip}:6443, uptime=$${UPTIME}s"

@@ -12,6 +12,12 @@ resolv_conf:
     - ${ns}
 %{ endfor ~}
 
+# ── MTU + MSS clamp（必須在 apt 前） ─────────────────────
+# bootcmd 每次 boot 都跑（idempotent）。不靠 DHCP 派 MTU。
+bootcmd:
+  - 'PRIMARY_IF=$(ip route show default | awk "{print \$5; exit}"); ip link set "$PRIMARY_IF" mtu ${network_mtu}'
+  - 'iptables -t mangle -C POSTROUTING -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu 2>/dev/null || iptables -t mangle -A POSTROUTING -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu'
+
 package_update: true
 package_upgrade: true
 
@@ -75,8 +81,7 @@ write_files:
       echo "==> [$(date)] k3s agent joined cluster successfully."
 
 runcmd:
-  # TCP MSS clamping — VXLAN overlay + 受限 MTU 環境
-  - iptables -t mangle -A POSTROUTING -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu
+  # MTU + MSS 已在 bootcmd 套用（每次 boot 自動 idempotent 套）
   - /opt/k3s-agent-init.sh
 
 final_message: "k3s agent joined cluster (master=${master_fixed_ip}), uptime=$${UPTIME}s"

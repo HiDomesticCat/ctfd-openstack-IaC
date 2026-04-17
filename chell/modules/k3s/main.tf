@@ -95,6 +95,7 @@ resource "openstack_compute_instance_v2" "master" {
     master_floating_ip = local.master_external_ip
     registry_ip        = var.registry_ip
     dns_nameservers    = var.dns_nameservers
+    network_mtu        = var.network_mtu
   })
 
   network {
@@ -131,6 +132,7 @@ resource "openstack_compute_instance_v2" "workers" {
     master_fixed_ip = local.master_join_ip
     registry_ip     = var.registry_ip
     dns_nameservers = var.dns_nameservers
+    network_mtu     = var.network_mtu
   })
 
   # 主介面：chell-network（k3s 控制面、kubelet ↔ master、預設路由）

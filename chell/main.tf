@@ -118,6 +118,7 @@ module "k3s" {
   volume_size      = var.volume_size
   registry_ip      = var.registry_ip
   dns_nameservers  = var.dns_nameservers
+  network_mtu      = var.network_mtu
 
   challenge_network_id = data.openstack_networking_network_v2.challenge_net.id
 
