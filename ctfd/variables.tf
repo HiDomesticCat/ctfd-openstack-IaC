@@ -44,6 +44,20 @@ variable "shared_network_name" {
   default     = ""
 }
 
+# ── 玩家↔題目共享網段（Phase 3+）────────────────────────────
+
+variable "use_challenge_network_for_scenarios" {
+  description = "openstack-vm scenario 部署題目時是否預設使用 challenge-net（玩家↔題目共享網段）。true（建議）= 題目實例放在 challenge-net，gamma4 上的 Caldera 直接打。false = 落回 ctfd-network，僅 debug 用。出題者仍可在 CTFd Advanced 區塊用 additional.network_id 個案覆蓋。"
+  type        = bool
+  default     = true
+}
+
+variable "challenge_network_name" {
+  description = "玩家↔題目共享網段名稱（admin 在 platform/ 創、RBAC share 過來）。data source 用名字引用。"
+  type        = string
+  default     = "challenge-net"
+}
+
 # 以下 variable 僅在 use_shared_network=false 時使用
 
 variable "external_network_id" {

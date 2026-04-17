@@ -56,6 +56,21 @@ locals {
   network_id = var.use_shared_network ? data.openstack_networking_network_v2.shared[0].id : module.network[0].network_id
 }
 
+# ── 玩家↔題目共享網段（Phase 3+）────────────────────────────
+# Admin 在 platform/ 創、RBAC share 給 ctfd-deployer。
+# openstack-vm scenario 部署題目 VM 時預設用這個網段，方便 gamma4 上的
+# Caldera 從 challenge-net 直接打題目（不走 FIP）。switch 預設 true；
+# 若需暫時切回 ctfd-network（debug 用），把 use_challenge_network_for_scenarios
+# 設 false。
+data "openstack_networking_network_v2" "challenge_net" {
+  count = var.use_challenge_network_for_scenarios ? 1 : 0
+  name  = var.challenge_network_name
+}
+
+locals {
+  scenario_network_id = var.use_challenge_network_for_scenarios ? data.openstack_networking_network_v2.challenge_net[0].id : local.network_id
+}
+
 # ── Security Group ─────────────────────────────────────────
 module "secgroup" {
   source = "./modules/secgroup"
@@ -115,7 +130,7 @@ module "instance" {
 # ⚠️ 靜態設定（flag、flavor、port）仍在 group_vars/all/challenge.yml 手動維護
 resource "local_file" "challenge_ids" {
   content = templatefile("${path.module}/templates/challenge_ids.tpl", {
-    network_id            = local.network_id
+    network_id            = local.scenario_network_id
     image_id              = var.image_id
     challenge_secgroup_ids = module.challenge_secgroups.ids
   })
