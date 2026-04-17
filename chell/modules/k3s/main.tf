@@ -45,11 +45,24 @@ resource "openstack_networking_port_v2" "master" {
   }
 }
 
-# ── Worker Ports ──────────────────────────────────────────
+# ── Worker Ports（主：chell-network 控制面）─────────────────
 resource "openstack_networking_port_v2" "workers" {
   count          = var.worker_count
   name           = "${var.worker_name}-${count.index + 1}-port"
   network_id     = var.network_id
+  admin_state_up = true
+
+  security_group_ids = [var.secgroup_id]
+}
+
+# ── Worker 第二個 port：challenge-net（玩家↔題目共享網段）─────
+# kube-proxy 預設聽全部介面，所以 NodePort 30000-32767 在這個網段也通。
+# gamma4 VM 也接同一網段，Caldera 直接打 worker challenge-net IP : NodePort，
+# 省掉 worker FIP 那一跳。secgroup 共用 chell-sg（NodePort 已對 0.0.0.0/0 開放）。
+resource "openstack_networking_port_v2" "workers_challenge_net" {
+  count          = var.challenge_network_id != "" ? var.worker_count : 0
+  name           = "${var.worker_name}-${count.index + 1}-challenge-port"
+  network_id     = var.challenge_network_id
   admin_state_up = true
 
   security_group_ids = [var.secgroup_id]
@@ -120,13 +133,23 @@ resource "openstack_compute_instance_v2" "workers" {
     dns_nameservers = var.dns_nameservers
   })
 
+  # 主介面：chell-network（k3s 控制面、kubelet ↔ master、預設路由）
   network {
     port = openstack_networking_port_v2.workers[count.index].id
+  }
+
+  # 第二介面：challenge-net（玩家↔題目共享網段，NodePort 也聽在這）
+  dynamic "network" {
+    for_each = var.challenge_network_id != "" ? [1] : []
+    content {
+      port = openstack_networking_port_v2.workers_challenge_net[count.index].id
+    }
   }
 
   depends_on = [
     openstack_compute_instance_v2.master,
     openstack_networking_port_v2.workers,
+    openstack_networking_port_v2.workers_challenge_net,
   ]
 }
 

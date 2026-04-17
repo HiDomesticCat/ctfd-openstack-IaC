@@ -107,3 +107,9 @@ variable "dns_nameservers" {
   type        = list(string)
   default     = ["8.8.8.8", "8.8.4.4"]
 }
+
+variable "challenge_network_id" {
+  description = "玩家↔題目共享網段 ID（admin 在 platform/ 創、RBAC share 過來）。每個 worker 會多一個 port 接這個網段，NodePort (30000-32767) 從這聽，讓 gamma4 VM 上的 Caldera 直接打題目（不走 worker FIP）。空字串 = 不加第二個 port（向後相容）。"
+  type        = string
+  default     = ""
+}

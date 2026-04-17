@@ -67,6 +67,12 @@ data "openstack_networking_subnet_ids_v2" "shared" {
   network_id = data.openstack_networking_network_v2.shared[0].id
 }
 
+# ── 玩家↔題目共享網段（admin 在 platform/ 創、RBAC share 過來）──
+# Worker 多一個 port 接這個網段，gamma4 VM 上的 Caldera 直接打題目。
+data "openstack_networking_network_v2" "challenge_net" {
+  name = var.challenge_network_name
+}
+
 locals {
   network_id = var.use_shared_network ? data.openstack_networking_network_v2.shared[0].id : module.network[0].network_id
   subnet_id  = var.use_shared_network ? tolist(data.openstack_networking_subnet_ids_v2.shared[0].ids)[0] : module.network[0].subnet_id
@@ -112,6 +118,8 @@ module "k3s" {
   volume_size      = var.volume_size
   registry_ip      = var.registry_ip
   dns_nameservers  = var.dns_nameservers
+
+  challenge_network_id = data.openstack_networking_network_v2.challenge_net.id
 
   depends_on = [module.network, module.secgroup]
 }

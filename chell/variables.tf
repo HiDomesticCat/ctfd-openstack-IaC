@@ -203,3 +203,11 @@ variable "registry_ip" {
   type        = string
   default     = ""
 }
+
+# ── 玩家↔題目共享網段 ──────────────────────────────────────
+
+variable "challenge_network_name" {
+  description = "玩家↔題目共享網段名稱（admin 在 platform/ 創、RBAC share 過來）。data source 用名字引用，不靠 ID。"
+  type        = string
+  default     = "challenge-net"
+}
