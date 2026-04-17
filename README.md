@@ -7,8 +7,9 @@
 ```
 OpenStack (ctfd project / ctfd-deployer account)
 │
-├── platform/              OpenTofu — 共享基礎設施（Layer 1）
-│   └── modules/           network, images, flavors, project + quota
+├── platform/              OpenTofu — 共享基礎設施（Layer 1，admin scope）
+│   └── modules/           network, images, flavors, project + quota,
+│                          challenge_network (玩家↔題目共享網段，RBAC share 給 ctfd)
 │
 ├── ctfd/                  OpenTofu — CTFd VM 部署（Layer 2）
 │   └── modules/           keypair, network, secgroup, instance
@@ -17,6 +18,7 @@ OpenStack (ctfd project / ctfd-deployer account)
 ├── chell/                 OpenTofu — k3s 叢集（Layer 3，Kubernetes challenge 後端）
 │   └── modules/           k3s (master + workers), network, secgroup
 │       cloud-init: 自動安裝 k3s server/agent，產生 kubeconfig
+│       k3s worker 第二個 port 接 challenge-net（NodePort 從這聽）
 │
 └── ansible/               Ansible — 應用程式配置（Layer 4）
     ├── roles/ctfd/        CTFd v3.8.1 + ctfd-chall-manager plugin（Docker Compose）
@@ -24,10 +26,31 @@ OpenStack (ctfd project / ctfd-deployer account)
     ├── roles/k3s/         k3s 叢集驗證 + kubeconfig 部署到 CTFd server
     └── scenarios/
         ├── openstack-vm/  Pulumi Go — 為玩家建立 OpenStack VM + Floating IP
+        │                  預設網段 = challenge-net（可在 CTFd Advanced 個案覆蓋）
         └── k8s-pod/       Pulumi Go — 為玩家在 k3s 建立 Namespace + Pod + NodePort Service
 ```
 
 **部署順序：** `platform` → `ctfd` → `chell`（選用）→ `ansible`
+
+## 網段配置
+
+lab 內的 IP 段（連續編號慣例）：
+
+| CIDR | 用途 | 由哪管 |
+|------|------|--------|
+| `192.168.50.0/24` | 管理 LAN（control plane、operator、CTFd web FIP） | OpenStack `public` external network |
+| `192.168.77.0/24` | gamma4 研究 VM 內網 | sister repo `gamma4-lab-infra` |
+| **`192.168.78.0/24`** | **玩家↔題目共享網段（challenge-net）** | **`platform/modules/challenge_network/`** |
+| `192.168.100.0/24` | CTFd web 前端 | `ctfd/` |
+| `192.168.200.0/24` | k3s 控制面 | `chell/` |
+
+**challenge-net** 是 admin 創、透過 `openstack_networking_rbac_policy_v2` 用 `access_as_shared` 分享給 ctfd-deployer project 的內部 VXLAN 網段。三方共用：
+
+- **k3s worker**（chell/）— 加第二個 port 接 challenge-net；NodePort (30000-32767) 從這個介面也聽
+- **openstack-vm scenario**（ctfd/）— 題目 VM 預設網段（`use_challenge_network_for_scenarios = true`）
+- **gamma4 研究 VM**（sister repo）— 加第二個 port 接 challenge-net；Caldera 直接打題目（不走 worker FIP）
+
+子網段隨網段一起被 RBAC 分享，不需要額外 subnet RBAC。各層用名字（`challenge-net`）`data source` 引用，不靠 ID（每次 apply ID 都不同）。
 
 ## 前置需求
 
