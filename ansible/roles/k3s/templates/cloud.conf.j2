@@ -1,0 +1,15 @@
+# cloud.conf — Cinder CSI driver OpenStack auth config
+# Rendered by ansible/roles/k3s from group_vars/all/vault.yml.
+# Mounted into the cinder-csi-plugin pod via the cloud-config secret.
+
+[Global]
+auth-url = {{ vault_openstack_auth_url }}
+username = {{ vault_openstack_username }}
+password = {{ vault_openstack_password }}
+tenant-name = {{ vault_openstack_project_name }}
+region = {{ vault_openstack_region | default('RegionOne') }}
+user-domain-name = {{ vault_openstack_user_domain | default('Default') }}
+
+[BlockStorage]
+# Single-AZ lab — don't pin volumes to a specific AZ at provision time.
+ignore-volume-az = true

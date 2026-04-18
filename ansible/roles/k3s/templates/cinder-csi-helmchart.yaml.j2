@@ -1,0 +1,27 @@
+# k3s HelmChart CRD — installs Cinder CSI driver via k3s's built-in
+# helm-controller. K3s watches /var/lib/rancher/k3s/server/manifests/
+# and applies anything dropped there. The cloud-config Secret must
+# exist in kube-system before this chart converges (created in the
+# preceding ansible task).
+
+apiVersion: helm.cattle.io/v1
+kind: HelmChart
+metadata:
+  name: openstack-cinder-csi
+  namespace: kube-system
+spec:
+  chart: openstack-cinder-csi
+  repo: https://kubernetes.github.io/cloud-provider-openstack
+  version: "{{ cinder_csi_chart_version }}"
+  targetNamespace: kube-system
+  valuesContent: |-
+    secret:
+      enabled: true
+      create: false
+      name: cloud-config
+    storageClass:
+      enabled: true
+      delete:
+        isDefault: true
+        allowVolumeExpansion: true
+        reclaimPolicy: Delete

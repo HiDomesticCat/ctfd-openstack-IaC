@@ -30,3 +30,14 @@ k3s_challenge_prepull_images: []
 # ── chall-manager 目錄（需與 chall-manager role 一致）────
 # 這裡引用 chall-manager role 的 vars，若分開執行可能需要明確設定
 chall_manager_dir: "/opt/chall-manager"
+
+# ── Cinder CSI driver（OpenStack 動態 PV）────────────────
+# 從 https://kubernetes.github.io/cloud-provider-openstack 拉。
+# Chart version 對齊 k3s 版本（k3s 1.31.x → CSI 2.31.x）。
+# 升級時：bump 此值 + apply playbook，helm-controller 會 in-place 升級。
+cinder_csi_chart_version: "2.31.2"
+
+# Zombie node cleanup 門檻：NotReady 超過此秒數視為死節點，會被砍。
+# tofu 重建 worker 後，舊 hash 名的 Node object 會 NotReady — 超時後本 task 清掉。
+# 預設 1 小時：充分長到不會誤砍真的暫時故障的節點。
+k3s_zombie_node_max_age_seconds: 3600

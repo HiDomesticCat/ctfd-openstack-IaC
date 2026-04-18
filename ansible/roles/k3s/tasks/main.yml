@@ -12,6 +12,27 @@
     timeout: 600
     state: started
 
+# ── Zombie node cleanup ───────────────────────────────────
+# tofu force-replace worker 時，新 worker 用 --with-node-id hash 後綴註冊，
+# 舊 hash 名的 Node object 會留下變 NotReady。這 task 在等 Ready 之前先砍掉，
+# 避免下方 wait-all-Ready 卡在 zombie 上、且讓 kubectl get nodes 乾淨。
+- name: 識別 zombie node（NotReady AND age > k3s_zombie_node_max_age_seconds）
+  shell: |
+    set -euo pipefail
+    kubectl get nodes -o json | jq -r --argjson maxage {{ k3s_zombie_node_max_age_seconds }} '
+      .items[]
+      | select(any(.status.conditions[]; .type=="Ready" and .status!="True"))
+      | select((.metadata.creationTimestamp | fromdateiso8601) < (now - $maxage))
+      | .metadata.name
+    '
+  register: zombie_nodes
+  changed_when: false
+
+- name: 砍掉 zombie node
+  shell: kubectl delete node {{ item }}
+  loop: "{{ zombie_nodes.stdout_lines }}"
+  when: zombie_nodes.stdout_lines | length > 0
+
 - name: 等待所有節點進入 Ready 狀態
   shell: |
     NOT_READY=$(kubectl get nodes --no-headers 2>/dev/null \
@@ -86,6 +107,58 @@
         limits.memory: "{{ k3s_challenge_memory_limit_total }}"
     YAML
   changed_when: false
+
+# ── Cinder CSI driver（OpenStack 動態 PV）────────────────
+# 監控研究（Prometheus / OpenObserve）需要 PV 在 worker rebuild 時存活。
+# k3s 預設 local-path-provisioner 的 PV 綁本機 disk，worker 重建即丟。
+# Cinder CSI 從 OpenStack Cinder 動態 provision，重建後 PV 重新 mount。
+
+- name: 渲染 cloud.conf（Cinder CSI 用的 OpenStack 認證）
+  template:
+    src: cloud.conf.j2
+    dest: /tmp/cinder-csi-cloud.conf
+    mode: "0600"
+  changed_when: false
+
+- name: 確保 kube-system/cloud-config secret 同步（Cinder CSI 用）
+  shell: |
+    kubectl -n kube-system create secret generic cloud-config \
+      --from-file=cloud.conf=/tmp/cinder-csi-cloud.conf \
+      --dry-run=client -o yaml | kubectl apply -f -
+  changed_when: false
+
+- name: 移除暫存的 cloud.conf
+  file:
+    path: /tmp/cinder-csi-cloud.conf
+    state: absent
+
+- name: 部署 Cinder CSI HelmChart 到 k3s manifests 目錄
+  template:
+    src: cinder-csi-helmchart.yaml.j2
+    dest: /var/lib/rancher/k3s/server/manifests/cinder-csi.yaml
+    mode: "0644"
+    owner: root
+    group: root
+  become: yes
+  register: cinder_csi_manifest
+
+- name: 等待 Cinder CSI controller pods 就緒
+  shell: |
+    kubectl -n kube-system get pods -l app=openstack-cinder-csi --no-headers 2>/dev/null \
+      | awk '$3!="Running" || $2!~/^[0-9]+\/[0-9]+$/ { print }' | wc -l
+  register: csi_not_ready
+  retries: 60
+  delay: 10
+  until: csi_not_ready.stdout | trim == "0"
+  changed_when: false
+
+- name: 確認 'cinder.csi.openstack.org' StorageClass 存在且為 default
+  shell: |
+    kubectl get storageclass -o json \
+      | jq -r '.items[] | select(.provisioner=="cinder.csi.openstack.org") | .metadata.annotations["storageclass.kubernetes.io/is-default-class"]'
+  register: cinder_default
+  changed_when: false
+  failed_when: cinder_default.stdout | trim != "true"
 
 # ── Pre-pull challenge images（加速首次啟動）───────────────
 # 在 k3s 節點預先拉取題目 image，搭配 ImagePullPolicy: IfNotPresent
