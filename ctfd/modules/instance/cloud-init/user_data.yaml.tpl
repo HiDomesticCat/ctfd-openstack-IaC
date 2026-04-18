@@ -4,6 +4,12 @@
 
 timezone: ${timezone}
 
+# ── NTP 顯式啟用 ───────────────────────────────────────────
+# Ubuntu 24.04 systemd-timesyncd 預設 on，但 IaC 不依賴 distro default。
+# 跨 VM 監控研究（trace/metric correlation）的時鐘同步前提。
+bootcmd:
+  - 'timedatectl set-ntp true'
+
 # ── DNS 設定（確保 SNAT 模式下 apt/docker 能解析域名）────────
 manage_resolv_conf: true
 resolv_conf:
