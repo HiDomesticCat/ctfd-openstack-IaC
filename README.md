@@ -98,10 +98,11 @@ ansible-vault encrypt ansible/group_vars/all/vault.yml
 ```bash
 cd platform
 cp terraform.tfvars.example terraform.tfvars
-$EDITOR terraform.tfvars        # 設定 ctfd_deployer_password 等
+$EDITOR terraform.tfvars        # 設定 network_mtu / quota 等；ctfd_deployer_password 留空就會自動產生
 
 tofu init && tofu apply
 tofu output                     # 記下：external_network_id, image_ids["ubuntu2204"]
+tofu output -raw ctfd_deployer_password   # 取出自動產生的密碼，貼進 ~/.config/openstack/clouds.yaml 的 ctfd entry
 ```
 
 ### Step 3 — 部署 CTFd VM（ctfd）
@@ -127,7 +128,7 @@ cd ../chell
 cp terraform.tfvars.example terraform.tfvars
 $EDITOR terraform.tfvars
 # 必填：external_network_id, image_id（來自 Step 2）
-# 必填：k3s_token（建議用強隨機值：openssl rand -hex 32）
+# 留空：k3s_token 會自動 random_password 產生並 persist 在 tfstate
 # 建議：ssh_allowed_cidr 限制為管理機 IP（如 10.0.2.5/32）
 
 tofu init && tofu apply
@@ -162,6 +163,57 @@ ansible-playbook site.yml \
   -i inventory/k3s_hosts.ini \
   --ask-vault-pass
 ```
+
+## Rebuild & Reproducibility
+
+整個 stack 設計為可 `tofu destroy && tofu apply` 重建。下列機制讓 rebuild 不需要手動介入：
+
+| 機制 | 解決什麼 |
+|------|---------|
+| **k3s `--with-node-id`**（agent.yaml.tpl） | Worker rebuild 時 hostname 加 hash 後綴（`chell-worker-1-<id>`），新 node 不會撞 master 的 stale node-passwd entry。**不需要 `kubectl delete node`**。 |
+| **`random_password.k3s_token`**（chell/main.tf） | `var.k3s_token` 留空時自動產生並 persist 在 tfstate，跨 apply 不變。Operator 不用 `openssl rand`。 |
+| **`random_password.ctfd_deployer_password`**（platform/main.tf） | 同上；自動產生後用 `tofu output -raw ctfd_deployer_password` 取出貼進 clouds.yaml。 |
+| **MTU 顯式設定 in cloud-init bootcmd**（chell + ctfd） | 不靠 DHCP（in-place network MTU update 不會傳到既有 VM）；改 tfvars 後 force-replace 即生效。 |
+| **Sister gamma4-lab-infra: cloud-init `git clone` retry loop** | 第一次 fresh deploy 操作者貼 GitHub deploy key 到 repo settings 時，cloud-init 會等到 clone 成功（15 min 容窗）。 |
+
+**Fresh deploy 一個新 OpenStack cluster 從零開始**：
+
+```bash
+# 0. 一次性：clouds.yaml 的 admin section（手動，無法 IaC）
+$EDITOR ~/.config/openstack/clouds.yaml      # 加 openstack (admin) entry
+
+# 1. platform — admin scope，創 ctfd project + challenge-net
+cd platform && cp terraform.tfvars.example terraform.tfvars && tofu init && tofu apply
+DEPLOYER_PW=$(tofu output -raw ctfd_deployer_password)
+# 把 $DEPLOYER_PW 貼進 clouds.yaml 的 ctfd entry password 欄位
+
+# 2. ctfd — CTFd VM（新 ctfd cloud entry 即可登入）
+cd ../ctfd && cp terraform.tfvars.example terraform.tfvars && tofu init && tofu apply
+
+# 3. chell — k3s 叢集
+cd ../chell && cp terraform.tfvars.example terraform.tfvars && tofu init && tofu apply
+
+# 4. ansible — 應用程式層
+cd ../ansible
+cp group_vars/all/vault.yml.example group_vars/all/vault.yml
+$EDITOR group_vars/all/vault.yml && ansible-vault encrypt group_vars/all/vault.yml
+ansible-playbook site.yml -i inventory/hosts.ini -i inventory/k3s_hosts.ini --ask-vault-pass
+
+# 5. （選用）gamma4-lab-infra — 研究 VM
+cd /data/gamma4-lab-infra
+export TF_VAR_openrouter_api_key=sk-or-...
+tofu init && tofu apply                       # 第一次會卡在 git clone（deploy key 未註冊）
+tofu output -raw github_deploy_public_key     # 貼到 GitHub repo Settings -> Deploy keys
+# cloud-init 的 retry loop 會在 15 min 內偵測到 deploy key OK 自動繼續
+```
+
+**Operator 必填的 4 個機密**（無法 IaC 化）：
+1. `clouds.yaml` 的 admin password（OpenStack admin 帳號）
+2. `ansible-vault` 密碼（vault.yml 解密）
+3. `TF_VAR_openrouter_api_key`（gamma4-lab-infra）
+4. GitHub deploy key 公鑰一次性貼到 repo settings（gamma4-lab-infra）
+
+其他全部 IaC 自動化。
 
 ## Local Config Files（gitignored，不進入版本控制）
 
