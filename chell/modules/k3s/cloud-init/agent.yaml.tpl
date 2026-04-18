@@ -75,15 +75,23 @@ write_files:
       export INSTALL_K3S_VERSION="${k3s_version}"
       %{~ endif }
 
-      # Pin k3s INTERNAL-IP to whichever interface can reach the master.
-      # `ip route show default` is non-deterministic when the worker has
-      # two NICs (chell-network + challenge-net) — DHCP races give both
-      # default routes and `awk '... ; exit'` would pick whichever was
-      # first. `ip route get $MASTER` instead asks the kernel "which
-      # source IP would I use to talk to the master?" and the answer is
-      # always the chell-network IP because that's where master lives.
-      NODE_IP=$(ip -4 route get ${master_fixed_ip} | awk '{for(i=1;i<=NF;i++) if($i=="src") {print $(i+1); exit}}')
-      echo "    node-ip (route-based, towards master ${master_fixed_ip}): $NODE_IP"
+      # Pin BOTH k3s INTERNAL-IP and flannel VXLAN PublicIP to the interface
+      # that can reach the master. With two NICs (chell-network + challenge-
+      # net), DHCP races put default routes on both — k3s and flannel each
+      # silently pick the first one. Without this, observed in practice:
+      # worker registers flannel VXLAN PublicIP as the challenge-net IP, the
+      # master tries to tunnel pod traffic to 192.168.78.x, the underlay
+      # has no route there, packets vanish, all cross-node pod traffic
+      # (CoreDNS, helm install, etc.) silently times out.
+      #
+      # `ip route get $MASTER` asks the kernel "which interface + source IP
+      # would I use to reach the master?" — deterministic regardless of how
+      # many other NICs we have or DHCP timing.
+      ROUTE_INFO=$(ip -4 route get ${master_fixed_ip} | head -1)
+      NODE_IP=$(echo "$ROUTE_INFO" | awk '{for(i=1;i<=NF;i++) if($i=="src") {print $(i+1); exit}}')
+      NODE_IFACE=$(echo "$ROUTE_INFO" | awk '{for(i=1;i<=NF;i++) if($i=="dev") {print $(i+1); exit}}')
+      echo "    node-ip       (route-based src towards master): $NODE_IP"
+      echo "    flannel-iface (route-based dev towards master): $NODE_IFACE"
 
       # --with-node-id appends a stable hash suffix to the node name (e.g.
       # chell-worker-1-abc123). This prevents the "Node password rejected,
@@ -96,6 +104,7 @@ write_files:
         K3S_TOKEN="${k3s_token}" \
         sh -s - agent \
           --node-ip "$NODE_IP" \
+          --flannel-iface "$NODE_IFACE" \
           --with-node-id
 
       echo "==> [$(date)] k3s agent joined cluster successfully."
