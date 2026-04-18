@@ -26,6 +26,13 @@ resource "openstack_networking_subnet_v2" "challenge_net" {
   ip_version      = 4
   enable_dhcp     = true
   dns_nameservers = var.dns_nameservers
+
+  # 重要：challenge-net 是「純 player↔challenge L2 共享網段」，沒有 router 接外。
+  # 開 no_gateway 就讓 DHCP 不會 push default route — 否則 dual-NIC 主機（k3s
+  # worker、gamma4 VM）的 default route 會 race 到 challenge-net 的 .1，pod 出
+  # internet 卡 "no route to host"（challenge-net 真的沒 router）。
+  # 對外流量一律走 chell-network / 77 internal 那邊有 router 的介面。
+  no_gateway = true
 }
 
 # RBAC：分享給 ctfd-deployer 所屬 project
