@@ -154,13 +154,21 @@
   until: csi_not_ready.stdout | trim == "0"
   changed_when: false
 
-- name: 確認 'cinder.csi.openstack.org' StorageClass 存在且為 default
+# 取消 k3s 內建 local-path StorageClass 的 default 標記（兩個 default 會無法決定優先）
+- name: 取消 local-path StorageClass 的 default 註記
+  shell: |
+    kubectl patch storageclass local-path -p '{"metadata":{"annotations":{"storageclass.kubernetes.io/is-default-class":"false"}}}'
+  register: localpath_patch
+  changed_when: '"patched" in localpath_patch.stdout'
+  failed_when: localpath_patch.rc != 0 and "not found" not in localpath_patch.stderr
+
+- name: 確認至少一個 cinder StorageClass 被標記為 default
   shell: |
     kubectl get storageclass -o json \
-      | jq -r '.items[] | select(.provisioner=="cinder.csi.openstack.org") | .metadata.annotations["storageclass.kubernetes.io/is-default-class"]'
-  register: cinder_default
+      | jq -r '[.items[] | select(.provisioner=="cinder.csi.openstack.org" and .metadata.annotations["storageclass.kubernetes.io/is-default-class"]=="true") | .metadata.name] | length'
+  register: cinder_default_count
   changed_when: false
-  failed_when: cinder_default.stdout | trim != "true"
+  failed_when: (cinder_default_count.stdout | trim | int) < 1
 
 # ── Pre-pull challenge images（加速首次啟動）───────────────
 # 在 k3s 節點預先拉取題目 image，搭配 ImagePullPolicy: IfNotPresent
