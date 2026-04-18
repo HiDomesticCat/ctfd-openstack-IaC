@@ -73,14 +73,15 @@ write_files:
       export INSTALL_K3S_VERSION="${k3s_version}"
       %{~ endif }
 
-      # Pin k3s INTERNAL-IP to the primary (default-route) interface.
-      # Without this, when the worker has a second NIC on challenge-net,
-      # k3s races on DHCP and may pick the challenge-net IP as INTERNAL-IP,
-      # causing cross-node pod traffic to tunnel via challenge-net instead
-      # of chell-network's control plane.
-      PRIMARY_IF=$(ip route show default | awk '{print $5; exit}')
-      NODE_IP=$(ip -4 -o addr show "$PRIMARY_IF" | awk '{print $4}' | cut -d/ -f1)
-      echo "    node-ip (auto-detected): $NODE_IP (on $PRIMARY_IF)"
+      # Pin k3s INTERNAL-IP to whichever interface can reach the master.
+      # `ip route show default` is non-deterministic when the worker has
+      # two NICs (chell-network + challenge-net) — DHCP races give both
+      # default routes and `awk '... ; exit'` would pick whichever was
+      # first. `ip route get $MASTER` instead asks the kernel "which
+      # source IP would I use to talk to the master?" and the answer is
+      # always the chell-network IP because that's where master lives.
+      NODE_IP=$(ip -4 route get ${master_fixed_ip} | awk '{for(i=1;i<=NF;i++) if($i=="src") {print $(i+1); exit}}')
+      echo "    node-ip (route-based, towards master ${master_fixed_ip}): $NODE_IP"
 
       # --with-node-id appends a stable hash suffix to the node name (e.g.
       # chell-worker-1-abc123). This prevents the "Node password rejected,
