@@ -25,6 +25,8 @@
       | select((.metadata.creationTimestamp | fromdateiso8601) < (now - $maxage))
       | .metadata.name
     '
+  args:
+    executable: /bin/bash    # dash 不支援 set -o pipefail
   register: zombie_nodes
   changed_when: false
 
