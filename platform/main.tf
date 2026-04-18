@@ -66,6 +66,18 @@ module "flavors" {
 
 # ── CTFd 環境的 Project ──────────────────────────────────────
 
+# 沒設 var.ctfd_deployer_password 時，自動產一把 32-char alphanum，
+# persist 在 tfstate。Apply 後操作者用 `tofu output -raw ctfd_deployer_password`
+# 取出貼進 clouds.yaml 的 ctfd cloud entry。
+resource "random_password" "ctfd_deployer_password" {
+  length  = 32
+  special = false
+}
+
+locals {
+  ctfd_deployer_password = var.ctfd_deployer_password != "" ? var.ctfd_deployer_password : random_password.ctfd_deployer_password.result
+}
+
 module "ctfd_project" {
   source = "./modules/project"
 
@@ -73,7 +85,7 @@ module "ctfd_project" {
   project_name        = var.project_name
   project_description = var.project_description
   username            = var.deployer_username
-  password            = var.ctfd_deployer_password
+  password            = local.ctfd_deployer_password
   role                = "member"
   enable_quota        = true
   quota               = var.quota

@@ -175,13 +175,14 @@ variable "volume_size" {
 
 # ── k3s ────────────────────────────────────────────────────
 variable "k3s_token" {
-  description = "k3s cluster 預共享 Token（server 與 agent 認證用，請使用強密碼，至少 32 字元）"
+  description = "k3s cluster 預共享 Token（server 與 agent 認證用）。空字串（預設）= 由 random_password 自動產生並 persist 在 tfstate；只在需要對齊既有 cluster token 時手動設值。"
   type        = string
   sensitive   = true
+  default     = ""
 
   validation {
-    condition     = length(var.k3s_token) >= 16
-    error_message = "k3s_token 長度至少 16 字元，建議使用隨機強密碼（openssl rand -hex 32）。"
+    condition     = var.k3s_token == "" || length(var.k3s_token) >= 16
+    error_message = "若手動設定 k3s_token，至少 16 字元。"
   }
 }
 

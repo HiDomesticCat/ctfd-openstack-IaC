@@ -26,6 +26,12 @@ output "ctfd_credentials" {
   value       = module.ctfd_project.credentials
 }
 
+output "ctfd_deployer_password" {
+  description = "CTFd 部署帳號密碼。Apply 後 `tofu output -raw ctfd_deployer_password` 取出，貼進 ~/.config/openstack/clouds.yaml 的 ctfd cloud entry password 欄位。手動設 var.ctfd_deployer_password 時也可從這拿值，方便驗證。"
+  sensitive   = true
+  value       = local.ctfd_deployer_password
+}
+
 # ── 玩家↔題目共享網段 ──────────────────────────────────────
 
 output "challenge_network_id" {

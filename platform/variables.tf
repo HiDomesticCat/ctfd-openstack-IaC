@@ -40,13 +40,14 @@ variable "deployer_username" {
 }
 
 variable "ctfd_deployer_password" {
-  description = "CTFd 部署帳號的密碼"
+  description = "CTFd 部署帳號的密碼。空字串（預設）= 由 random_password 自動產生並 persist 在 tfstate。Apply 後執行 `tofu output -raw ctfd_deployer_password` 取出，貼進 ~/.config/openstack/clouds.yaml 的 ctfd cloud entry。"
   type        = string
   sensitive   = true
+  default     = ""
 
   validation {
-    condition     = length(var.ctfd_deployer_password) >= 12
-    error_message = "密碼長度至少 12 個字元。"
+    condition     = var.ctfd_deployer_password == "" || length(var.ctfd_deployer_password) >= 12
+    error_message = "若手動設定密碼，至少 12 字元。"
   }
 }
 

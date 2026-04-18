@@ -82,11 +82,18 @@ write_files:
       NODE_IP=$(ip -4 -o addr show "$PRIMARY_IF" | awk '{print $4}' | cut -d/ -f1)
       echo "    node-ip (auto-detected): $NODE_IP (on $PRIMARY_IF)"
 
+      # --with-node-id appends a stable hash suffix to the node name (e.g.
+      # chell-worker-1-abc123). This prevents the "Node password rejected,
+      # duplicate hostname" error when an existing worker is force-replaced
+      # by tofu (the rebuilt VM keeps the same hostname but generates a new
+      # node-password; the suffix makes it register as a new node so the
+      # master's stale node-passwd entry is sidestepped).
       curl -sfL https://get.k3s.io | \
         K3S_URL="https://${master_fixed_ip}:6443" \
         K3S_TOKEN="${k3s_token}" \
         sh -s - agent \
-          --node-ip "$NODE_IP"
+          --node-ip "$NODE_IP" \
+          --with-node-id
 
       echo "==> [$(date)] k3s agent joined cluster successfully."
 

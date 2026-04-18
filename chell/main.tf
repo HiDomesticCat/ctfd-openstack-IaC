@@ -31,6 +31,18 @@
 #   - k3s API 6443 與 ssh_allowed_cidr 相同 CIDR，確認限制正確
 # ─────────────────────────────────────────────────────────────
 
+# ── k3s_token：未指定就自動產生 ────────────────────────────
+# 沒設 var.k3s_token 時，random_password 產一把 64-char alphanum，
+# persist 在 tfstate 跨 apply 不變。要對齊既有 cluster 才手動設 var。
+resource "random_password" "k3s_token" {
+  length  = 64
+  special = false
+}
+
+locals {
+  k3s_token = var.k3s_token != "" ? var.k3s_token : random_password.k3s_token.result
+}
+
 # ── SSH Keypair ────────────────────────────────────────────
 resource "openstack_compute_keypair_v2" "chell" {
   name       = var.keypair_name
@@ -110,7 +122,7 @@ module "k3s" {
   subnet_id        = local.subnet_id
   master_fixed_ip  = var.use_shared_network ? "" : var.master_fixed_ip
   floating_ip_pool = var.floating_ip_pool
-  k3s_token        = var.k3s_token
+  k3s_token        = local.k3s_token
   k3s_version      = var.k3s_version
   timezone         = var.timezone
   use_fip          = var.use_fip
