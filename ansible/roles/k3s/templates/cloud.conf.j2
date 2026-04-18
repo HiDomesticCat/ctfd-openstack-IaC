@@ -9,6 +9,9 @@ password = {{ vault_openstack_password }}
 tenant-name = {{ vault_openstack_project_name }}
 region = {{ vault_openstack_region | default('RegionOne') }}
 user-domain-name = {{ vault_openstack_user_domain | default('Default') }}
+# 同時提供 project domain — Cinder CSI driver 使用 ProjectName 認證時必須給 scope 的 domain，
+# 否則 controller pod CrashLoopBackOff with "must provide exactly one of DomainID or DomainName in a Scope with ProjectName"。
+tenant-domain-name = {{ vault_openstack_project_domain | default('Default') }}
 
 [BlockStorage]
 # Single-AZ lab — don't pin volumes to a specific AZ at provision time.
