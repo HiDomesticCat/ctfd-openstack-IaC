@@ -28,8 +28,14 @@ variable "keypair_name" {
 }
 
 variable "secgroup_name" {
-  description = "Security Group 名稱（由 secgroup 模組產生）"
+  description = "Security Group 名稱（由 secgroup 模組產生）。VM instance-level security_groups 用。"
   type        = string
+}
+
+variable "secgroup_id" {
+  description = "Security Group UUID（由 secgroup 模組產生）。Pre-built challenge-net port 需顯式指定 security_group_ids，否則 fallback 到 default secgroup，cm-proxy 8443/5443 rules 不生效。"
+  type        = string
+  default     = ""
 }
 
 variable "network_id" {
@@ -64,6 +70,31 @@ variable "mgmt_routes" {
     via = string  # gateway，如 "192.168.235.1"
   }))
   default = []
+}
+
+# ── Challenge-net secondary NIC（Phase 3 α-exposure）─────────
+# When non-empty, CTFd VM gets a 3rd port on the shared challenge-net subnet
+# (192.168.78.0/24). Purpose: cm-proxy Caddy (8443/5443) binds here so the
+# gamma4 research VM can reach chall-manager + registry without traversing
+# the FIP (which would need NAT hairpin and break IP-restricted secgroup).
+# Empty string = not attached (default; maintains pre-Phase-3 behaviour).
+
+variable "challenge_net_id" {
+  description = "OpenStack network UUID of the challenge-net shared subnet. Leave empty to skip the 3rd NIC (pre-Phase-3 behaviour). When set, the CTFd VM gets a pre-built port on this network so cm-proxy Caddy can bind to the challenge-net fixed IP."
+  type        = string
+  default     = ""
+}
+
+variable "challenge_net_subnet_id" {
+  description = "OpenStack subnet UUID inside challenge_net_id. Required when challenge_net_fixed_ip is set, ignored otherwise. Typically fetched via `data \"openstack_networking_subnet_v2\"` in the parent module and passed in."
+  type        = string
+  default     = ""
+}
+
+variable "challenge_net_fixed_ip" {
+  description = "Pin a specific IP on the challenge-net port so the address survives VM rebuilds AND `tofu destroy`+`tofu apply`. Empty = let neutron allocate (stable across VM rebuilds only). Paper-grade reproducibility wants this set to a specific /32 like \"192.168.78.162\"."
+  type        = string
+  default     = ""
 }
 
 # ── Volume Boot ───────────────────────────────────────────

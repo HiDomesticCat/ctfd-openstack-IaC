@@ -58,6 +58,58 @@ variable "challenge_network_name" {
   default     = "challenge-net"
 }
 
+# ── Phase 3 α-exposure（gamma4 research VM 整合）──────────────
+# 當為 true：CTFd VM 在 challenge-net (192.168.78.0/24) 上加一張 NIC，
+# ansible 的 cm-proxy role 會把 Caddy 綁在該 IP，提供 basic-auth 反代給
+# 外部可達的 chall-manager (8443) 和 registry (5443)。目的是讓 gamma4 VM
+# （也在 challenge-net）能不繞 FIP、不 NAT hairpin 地直接呼叫。
+#
+# 預設 false：維持 Phase 1-2 行為，不動既有部署。打開前要：
+#   1. 設定 cm_proxy_allowed_cidr（限制 8443/5443 只給 gamma4 VM 的 challenge-net IP/32）
+#   2. ansible-vault 裡填 vault_cm_proxy_basic_auth_hash（bcrypt）+ password
+#   3. tofu apply（CTFd VM 會新增 port，VM 本身會 in-place update，不 rebuild）
+#   4. ansible-playbook site.yml（cm-proxy role 部署 Caddy）
+#   5. 從 ctfd output 取 challenge_net_ip，填進 gamma4-lab-infra/terraform.tfvars
+variable "expose_cm_proxy_to_challenge_net" {
+  description = "Phase 3: CTFd VM 是否在 challenge-net 上加第二 NIC + 由 cm-proxy Caddy 對外暴露 chall-manager/registry（basic-auth 保護）。需搭配 use_challenge_network_for_scenarios=true。"
+  type        = bool
+  default     = false
+}
+
+variable "cm_proxy_allowed_cidr" {
+  description = "允許存取 cm-proxy (8443/5443) 的來源 CIDR，建議設為 gamma4 VM 的 challenge-net /32（e.g. \"192.168.78.17/32\"）。空字串=不建立規則（適用於 expose_cm_proxy_to_challenge_net=false 時）。"
+  type        = string
+  default     = ""
+
+  validation {
+    condition     = var.cm_proxy_allowed_cidr == "" || can(cidrhost(var.cm_proxy_allowed_cidr, 0))
+    error_message = "cm_proxy_allowed_cidr 必須是合法的 CIDR 格式，或空字串。"
+  }
+}
+
+variable "cm_proxy_chall_manager_port" {
+  description = "cm-proxy Caddy 對外聽的 chall-manager 反代 port。預設 8443（HTTP + basic-auth，internal net 不需 TLS）。"
+  type        = number
+  default     = 8443
+}
+
+variable "cm_proxy_registry_port" {
+  description = "cm-proxy Caddy 對外聽的 registry 反代 port。預設 5443（HTTP + basic-auth）。gamma4 VM 必須把這個 host:port 加進 Docker insecure-registries。"
+  type        = number
+  default     = 5443
+}
+
+variable "cm_proxy_fixed_ip" {
+  description = "Phase 3: pin the CTFd VM's challenge-net IP to a specific address so it survives `tofu destroy` + re-apply. Empty = let neutron allocate (stable across VM rebuilds only, drift on full destroy). Paper reproducibility wants this set."
+  type        = string
+  default     = ""
+
+  validation {
+    condition     = var.cm_proxy_fixed_ip == "" || can(cidrhost("${var.cm_proxy_fixed_ip}/32", 0))
+    error_message = "cm_proxy_fixed_ip must be a valid IPv4 address or empty."
+  }
+}
+
 # 以下 variable 僅在 use_shared_network=false 時使用
 
 variable "external_network_id" {

@@ -1,0 +1,102 @@
+# /opt/cm-proxy/Caddyfile (rendered by ansible, DO NOT edit on the VM)
+#
+# Phase 3 α-exposure: gate chall-manager + local OCI registry behind
+# basic-auth on the CTFd VM's challenge-net NIC. The gamma4 research VM
+# (also on challenge-net) is the only intended client; the Cinder-layer
+# secgroup further restricts ingress to gamma4's /32.
+#
+# Why HTTP (not HTTPS)?
+#   1. This is a point-to-point link inside a VXLAN-only closed network
+#      (challenge-net); on-the-wire sniffing requires compromising the
+#      hypervisor, not the network.
+#   2. Avoids the insecure-registries dance on every Docker daemon that
+#      needs to push.
+#   3. Basic-auth under Caddy uses bcrypt hash comparison; credential
+#      theft requires reading Caddy memory + surviving bcrypt — a weaker
+#      threat than network snooping HTTP in the open internet.
+# Revisit if challenge-net ever carries untrusted tenants.
+
+{
+  # Admin API off — this is a single-purpose proxy, config is static.
+  admin off
+  # No auto-HTTPS (we serve plain HTTP inside challenge-net).
+  auto_https off
+  # Global access log format (per-site log blocks override when needed).
+  log default {
+    output file /var/log/caddy/caddy.log {
+      roll_size 50mb
+      roll_keep 5
+    }
+    format json
+  }
+}
+
+# ── chall-manager reverse proxy ──────────────────────────────
+# `http://` prefix is mandatory here — Caddy defaults to HTTPS for any
+# non-80 port, which would then demand a cert. We serve plain HTTP because
+# this is a closed VXLAN link (see docstring at top).
+http://{{ cm_proxy_bind_ip }}:{{ cm_proxy_chall_manager_listen_port }} {
+  basic_auth {
+    {{ cm_proxy_basic_auth_user }} {{ cm_proxy_basic_auth_hash }}
+  }
+
+  # chall-manager exposes REST + gRPC on 8080. Caddy reverse_proxy handles
+  # both HTTP/1.1 and HTTP/2 (gRPC) transparently via the h2c upstream
+  # when needed. For the current consumer (gamma4 research scripts using
+  # HTTP REST), h2c is not strictly needed.
+  reverse_proxy {{ chall_manager_upstream }} {
+    # Preserve original Host so chall-manager's potential CORS / virtual
+    # host logic sees the real client-facing host.
+    header_up X-Real-IP {remote_host}
+    header_up X-Forwarded-Proto {scheme}
+    transport http {
+      read_timeout 120s
+      write_timeout 120s
+    }
+  }
+
+  log {
+    output file /var/log/caddy/chall-manager-access.log {
+      roll_size 50mb
+      roll_keep 5
+    }
+    format json
+  }
+}
+
+# ── Local OCI registry reverse proxy ─────────────────────────
+http://{{ cm_proxy_bind_ip }}:{{ cm_proxy_registry_listen_port }} {
+  basic_auth {
+    {{ cm_proxy_basic_auth_user }} {{ cm_proxy_basic_auth_hash }}
+  }
+
+  # registry:2 serves the OCI Distribution Spec HTTP API. Image push can
+  # exceed 50 MB per blob layer, so bump request limits.
+  request_body {
+    max_size 2GB
+  }
+
+  reverse_proxy {{ registry_upstream }} {
+    header_up X-Real-IP {remote_host}
+    header_up X-Forwarded-Proto {scheme}
+    # Long-running push ops: container image upload with large blobs can
+    # take a minute on a slow link.
+    transport http {
+      read_timeout 600s
+      write_timeout 600s
+      dial_timeout 5s
+    }
+    # Registry v2 requires the Docker-Distribution-Api-Version response
+    # header to pass through unchanged (Caddy forwards all unknown headers
+    # by default, so no action needed, but this comment documents the
+    # dependency).
+  }
+
+  log {
+    output file /var/log/caddy/registry-access.log {
+      roll_size 50mb
+      roll_keep 5
+    }
+    format json
+  }
+}

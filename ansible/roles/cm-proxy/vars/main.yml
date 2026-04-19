@@ -1,0 +1,47 @@
+# roles/cm-proxy/vars/main.yml
+#
+# Caddy reverse proxy fronting chall-manager + local OCI registry on the
+# CTFd VM's challenge-net NIC. Phase 3 α-exposure for the ICICS 2026 paper:
+# lets the gamma4 research VM reach both endpoints via basic-auth without
+# traversing the FIP (which would break NAT hairpin + IP-restricted
+# secgroup).
+
+# ── Pinned Caddy image (reproducibility) ─────────────────────
+# bump here + re-apply site.yml. Alpine variant keeps the image small and
+# shares no libc surface with chall-manager.
+caddy_image: "caddy:2.8.4-alpine"
+
+# ── Where cm-proxy's compose lives on the CTFd VM ────────────
+# Separate from chall-manager's compose (/opt/chall-manager) so bouncing
+# Caddy doesn't interrupt chall-manager.
+cm_proxy_dir: "/opt/cm-proxy"
+
+# ── Upstream endpoints (Caddy reverse_proxy targets) ─────────
+# chall-manager binds 127.0.0.1:8080 inside its own compose. registry
+# publishes 0.0.0.0:5000 via docker-compose "5000:5000". Caddy uses
+# network_mode: host so both are reachable as 127.0.0.1.
+chall_manager_upstream: "127.0.0.1:{{ chall_manager_port }}"
+registry_upstream: "127.0.0.1:{{ registry_port }}"
+
+# ── External listen addresses ────────────────────────────────
+# ansible fact ansible_default_ipv4 is the primary NIC (ctfd-network / mgmt
+# depending on deployment). For challenge-net NIC we pick the fact that
+# matches the challenge-net /24. cm_proxy_bind_ip is computed in
+# tasks/main.yml from ansible facts.
+
+cm_proxy_chall_manager_listen_port: 8443
+cm_proxy_registry_listen_port: 5443
+
+# ── Mirror chall-manager role's port vars ─────────────────
+# cm-proxy and chall-manager are separate roles; ansible does not share
+# vars/main.yml across roles. Keep these in sync with
+# roles/chall-manager/vars/main.yml whenever the ports change.
+chall_manager_port: 8080
+registry_port: 5000
+
+# ── Basic-auth credentials (consumed by Caddyfile template) ──
+# The PLAINTEXT user:pass pair is published to gamma4 via tofu output
+# on the gamma4-lab-infra side. The bcrypt HASH is what actually lives
+# in the Caddyfile on disk. Both come from ansible-vault.
+cm_proxy_basic_auth_user: "{{ vault_cm_proxy_basic_auth_user | default('gamma4') }}"
+cm_proxy_basic_auth_hash: "{{ vault_cm_proxy_basic_auth_hash }}"

@@ -29,3 +29,21 @@ vault_openstack_password: "<PASSWORD>"
 vault_openstack_region: "RegionOne"
 vault_openstack_user_domain: "Default"
 vault_openstack_project_domain: "Default"
+
+# ── Phase 3 α-exposure（cm-proxy Caddy basic-auth）──────────
+# Required ONLY when expose_cm_proxy_to_challenge_net = true in ctfd/
+# terraform.tfvars. Generate the bcrypt hash on ANY machine with caddy installed:
+#
+#   caddy hash-password --plaintext 'your-strong-password-here'
+#
+# Copy the resulting $2a$14$... string into vault_cm_proxy_basic_auth_hash.
+# Keep the plaintext in vault_cm_proxy_basic_auth_password so the gamma4 VM
+# operator can grab it for its terraform.tfvars (chall_manager_credentials /
+# registry_credentials).
+#
+# Rotation: pick a new password, re-hash, edit vault, re-run site.yml —
+# cm-proxy docker_compose_v2 will detect the Caddyfile change and restart.
+
+vault_cm_proxy_basic_auth_user: "gamma4"
+vault_cm_proxy_basic_auth_password: "<PLAINTEXT_PASSWORD>"
+vault_cm_proxy_basic_auth_hash: "$2a$14$REPLACE_WITH_caddy_hash-password_output"

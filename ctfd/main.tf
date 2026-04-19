@@ -63,8 +63,17 @@ locals {
 # 若需暫時切回 ctfd-network（debug 用），把 use_challenge_network_for_scenarios
 # 設 false。
 data "openstack_networking_network_v2" "challenge_net" {
-  count = var.use_challenge_network_for_scenarios ? 1 : 0
+  # Lookup needed if EITHER openstack-vm scenarios default to challenge-net
+  # OR Phase 3 α-exposure puts cm-proxy on the CTFd VM's challenge-net NIC.
+  count = (var.use_challenge_network_for_scenarios || var.expose_cm_proxy_to_challenge_net) ? 1 : 0
   name  = var.challenge_network_name
+}
+
+# Subnet inside challenge-net — only needed when pinning a fixed_ip for
+# cm-proxy's port. The network typically has exactly one subnet.
+data "openstack_networking_subnet_v2" "challenge_net" {
+  count      = var.expose_cm_proxy_to_challenge_net && var.cm_proxy_fixed_ip != "" ? 1 : 0
+  network_id = data.openstack_networking_network_v2.challenge_net[0].id
 }
 
 locals {
@@ -80,6 +89,11 @@ module "secgroup" {
   ssh_allowed_cidr       = var.ssh_allowed_cidr
   ctfd_port              = var.ctfd_port
   registry_allowed_cidr  = var.registry_allowed_cidr
+
+  # Phase 3 α-exposure: cm-proxy Caddy on challenge-net.
+  cm_proxy_allowed_cidr       = var.cm_proxy_allowed_cidr
+  cm_proxy_chall_manager_port = var.cm_proxy_chall_manager_port
+  cm_proxy_registry_port      = var.cm_proxy_registry_port
 
   providers = { openstack = openstack }
 }
@@ -102,6 +116,7 @@ module "instance" {
   flavor_name      = var.flavor_name
   keypair_name     = module.keypair.keypair_name
   secgroup_name    = module.secgroup.secgroup_name
+  secgroup_id      = module.secgroup.secgroup_id
   network_id       = local.network_id
   use_floating_ip  = var.use_floating_ip
   floating_ip_pool = var.floating_ip_pool
@@ -113,6 +128,16 @@ module "instance" {
   # 管理網路（可選，讓 VM 能連到 OpenStack API）
   mgmt_network_id = var.mgmt_network_id
   mgmt_routes     = var.mgmt_routes
+
+  # Challenge-net 第二網卡（Phase 3 α-exposure）
+  # expose_cm_proxy_to_challenge_net=true 時，CTFd VM 在 challenge-net
+  # 上取得固定 IP。cm-proxy ansible role 會把 Caddy 綁在該 IP 上。
+  # use_challenge_network_for_scenarios=true 時 data source 已被 lookup，
+  # 這裡直接引用；否則必須先 lookup。為簡化，expose_cm_proxy 要求
+  # use_challenge_network_for_scenarios 必須為 true（paper 情境下兩者必同開）。
+  challenge_net_id        = var.expose_cm_proxy_to_challenge_net ? data.openstack_networking_network_v2.challenge_net[0].id : ""
+  challenge_net_subnet_id = (var.expose_cm_proxy_to_challenge_net && var.cm_proxy_fixed_ip != "") ? data.openstack_networking_subnet_v2.challenge_net[0].id : ""
+  challenge_net_fixed_ip  = var.cm_proxy_fixed_ip
 
   # Cloud-init 設定
   timezone        = var.timezone

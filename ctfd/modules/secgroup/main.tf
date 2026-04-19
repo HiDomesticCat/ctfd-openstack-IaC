@@ -60,4 +60,33 @@ resource "openstack_networking_secgroup_rule_v2" "registry" {
   port_range_max    = 5000
   remote_ip_prefix  = var.registry_allowed_cidr
   security_group_id = openstack_networking_secgroup_v2.this.id
+  description       = "Direct registry ingress (bypasses cm-proxy; prefer cm-proxy_registry)"
+}
+
+# ── Phase 3 cm-proxy 反代 ────────────────────────────────────
+# Caddy on the CTFd VM's challenge-net NIC. basic-auth gates both endpoints.
+# Intended consumer: the gamma4 research VM (also on challenge-net).
+
+resource "openstack_networking_secgroup_rule_v2" "cm_proxy_chall_manager" {
+  count             = var.cm_proxy_allowed_cidr != "" ? 1 : 0
+  direction         = "ingress"
+  ethertype         = "IPv4"
+  protocol          = "tcp"
+  port_range_min    = var.cm_proxy_chall_manager_port
+  port_range_max    = var.cm_proxy_chall_manager_port
+  remote_ip_prefix  = var.cm_proxy_allowed_cidr
+  security_group_id = openstack_networking_secgroup_v2.this.id
+  description       = "cm-proxy Caddy → chall-manager (basic-auth)"
+}
+
+resource "openstack_networking_secgroup_rule_v2" "cm_proxy_registry" {
+  count             = var.cm_proxy_allowed_cidr != "" ? 1 : 0
+  direction         = "ingress"
+  ethertype         = "IPv4"
+  protocol          = "tcp"
+  port_range_min    = var.cm_proxy_registry_port
+  port_range_max    = var.cm_proxy_registry_port
+  remote_ip_prefix  = var.cm_proxy_allowed_cidr
+  security_group_id = openstack_networking_secgroup_v2.this.id
+  description       = "cm-proxy Caddy → registry (basic-auth)"
 }

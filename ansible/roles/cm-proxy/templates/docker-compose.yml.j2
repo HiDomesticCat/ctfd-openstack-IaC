@@ -1,0 +1,31 @@
+# /opt/cm-proxy/docker-compose.yml (rendered by ansible, DO NOT edit on the VM)
+#
+# Single-service compose that runs Caddy with network_mode: host. We pick
+# host networking because:
+#   1. Caddy must bind to the CTFd VM's challenge-net NIC IP (not a Docker
+#      bridge) so the OpenStack secgroup on the challenge-net port can
+#      filter by source CIDR.
+#   2. reverse_proxy targets chall-manager's 127.0.0.1:8080 and registry's
+#      127.0.0.1:5000 — both are loopback from the host's POV, trivially
+#      reachable with host networking.
+# Downside: port conflicts with any other host-bound service on the listen
+# ports. We reserve {{ cm_proxy_chall_manager_listen_port }} / {{ cm_proxy_registry_listen_port }} explicitly for this role.
+
+services:
+  caddy:
+    image: {{ caddy_image }}
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - {{ cm_proxy_dir }}/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+      - /var/log/caddy:/var/log/caddy
+    # Caddy image's default CMD starts with /etc/caddy/Caddyfile; no
+    # command override needed. It re-reads config on SIGUSR1 (the Caddy
+    # binary's built-in config reload) but compose recreates the container
+    # on template changes, which is simpler and sufficient.
+
+volumes:
+  caddy-data:
+  caddy-config:

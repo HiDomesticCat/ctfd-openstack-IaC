@@ -25,3 +25,27 @@ public_key_path = "~/.ssh/id_rsa.pub"
 # ── Registry Security Group（k3s 節點存取 Docker Registry）───
 # k3s 節點所在子網的 CIDR，空字串=不建立規則
 # registry_allowed_cidr = "192.168.234.0/24"
+
+# ── Phase 3 α-exposure（gamma4 research VM 整合）──────────────
+# 只有在執行 ICICS 2026 論文 Phase 3 時才打開。啟用後：
+#   1. CTFd VM 在 challenge-net 上增加一張 NIC（in-place update，不 rebuild）
+#   2. secgroup 開 8443 / 5443 只給 gamma4 VM 的 challenge-net IP
+#   3. ansible-playbook 跑 cm-proxy role，把 Caddy 部署到 CTFd VM
+#   4. gamma4 VM 透過 basic-auth 呼叫 chall-manager + push 到 registry
+#
+# 啟用步驟：
+#   a. 先 tofu apply 開 NIC（這時還沒 ansible 部署 Caddy，所以 Caddy 沒聽）
+#   b. 取得 gamma4 VM 的 challenge-net IP：
+#        cd /data/gamma4-lab-infra && tofu output -raw vm_challenge_net_ip
+#      填到 cm_proxy_allowed_cidr（/32 尾巴）
+#   c. ansible-vault edit ansible/group_vars/all/vault.yml，加：
+#        vault_cm_proxy_basic_auth_user:     gamma4
+#        vault_cm_proxy_basic_auth_password: <隨機字串>
+#        vault_cm_proxy_basic_auth_hash:     $(caddy hash-password --plaintext '<上面的隨機字串>')
+#   d. ansible-playbook site.yml -i inventory/hosts.ini --ask-vault-pass
+#   e. 回來：tofu output gamma4_env_hints，把 URL 填進 gamma4-lab-infra/terraform.tfvars
+#
+# expose_cm_proxy_to_challenge_net = true
+# cm_proxy_allowed_cidr            = "192.168.78.17/32"  # gamma4 VM challenge-net IP
+# cm_proxy_chall_manager_port      = 8443
+# cm_proxy_registry_port           = 5443

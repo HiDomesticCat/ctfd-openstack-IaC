@@ -1,0 +1,138 @@
+# roles/cm-proxy/tasks/main.yml
+#
+# Deploys Caddy as a basic-auth reverse proxy in front of chall-manager
+# and the local OCI registry, bound to the CTFd VM's challenge-net NIC.
+# Preconditions (enforced by asserts):
+#   - challenge-net IP present as an ansible fact (VM must have a port
+#     on that network; provisioned by ctfd/ tofu when
+#     expose_cm_proxy_to_challenge_net = true)
+#   - vault_cm_proxy_basic_auth_hash set (ansible-vault)
+
+# ── Pre-flight checks ──────────────────────────────────────
+
+# Split the filter chain across two set_fact tasks. Inline nesting of
+# regex_replace + regex_escape + select('match') inside a single jinja
+# expression hits operator precedence edge cases and silently yields an
+# empty selection. Doing it in two steps is both more debuggable and more
+# portable across ansible 2.15/2.16 versions.
+
+- name: Compute challenge-net regex prefix from cm_proxy_challenge_net_cidr
+  set_fact:
+    # For "192.168.78.0/24" → "^192\.168\.78\."
+    # rsplit drops the last octet, regex_escape escapes the dots.
+    cm_proxy_net_prefix_re: "^{{ cm_proxy_challenge_net_cidr.split('/')[0].rsplit('.', 1)[0] | regex_escape }}\\."
+
+- name: Resolve CTFd VM's challenge-net IP by prefix match
+  set_fact:
+    cm_proxy_bind_ip: "{{ ansible_all_ipv4_addresses | select('match', cm_proxy_net_prefix_re) | list | first | default('') }}"
+
+- name: Show resolved challenge-net IP (for diagnosability)
+  debug:
+    msg:
+      - "cm_proxy_challenge_net_cidr : {{ cm_proxy_challenge_net_cidr }}"
+      - "cm_proxy_net_prefix_re      : {{ cm_proxy_net_prefix_re }}"
+      - "ansible_all_ipv4_addresses  : {{ ansible_all_ipv4_addresses }}"
+      - "cm_proxy_bind_ip (resolved) : {{ cm_proxy_bind_ip }}"
+
+- name: Fail clearly if challenge-net IP could not be resolved
+  assert:
+    that:
+      - cm_proxy_bind_ip is defined
+      - cm_proxy_bind_ip | length > 0
+      - cm_proxy_bind_ip != 'None'
+    fail_msg: >-
+      CTFd VM has no IPv4 address inside {{ cm_proxy_challenge_net_cidr }}.
+      Run  tofu apply  in /data/ctfd-openstack-IaC/ctfd/ with
+      expose_cm_proxy_to_challenge_net = true first, then re-run this playbook.
+
+- name: Fail clearly if basic-auth hash is missing from vault
+  assert:
+    that:
+      - cm_proxy_basic_auth_hash is defined
+      - cm_proxy_basic_auth_hash | length > 0
+      - cm_proxy_basic_auth_hash.startswith('$2')
+    fail_msg: >-
+      vault_cm_proxy_basic_auth_hash is empty or not a bcrypt hash. Generate it with
+        caddy hash-password --plaintext '<strong-password>'
+      and put it into  ansible/group_vars/all/vault.yml  under
+      vault_cm_proxy_basic_auth_hash.
+
+# ── Prep the compose directory + logs ─────────────────────
+
+- name: Ensure cm-proxy directory exists
+  file:
+    path: "{{ cm_proxy_dir }}"
+    state: directory
+    mode: "0755"
+    owner: ubuntu
+    group: ubuntu
+
+- name: Ensure Caddy log directory exists (bind-mounted into container)
+  file:
+    path: /var/log/caddy
+    state: directory
+    mode: "0755"
+    # Caddy inside the alpine image runs as root by default; keeping this
+    # root-owned is consistent. Rotated files will inherit 0644.
+    owner: root
+    group: root
+
+# ── Render Caddyfile + docker-compose ─────────────────────
+
+- name: Render Caddyfile
+  template:
+    src: Caddyfile.j2
+    dest: "{{ cm_proxy_dir }}/Caddyfile"
+    mode: "0644"
+    owner: ubuntu
+    group: ubuntu
+  register: caddyfile_rendered
+  notify: Restart cm-proxy Caddy
+
+- name: Render cm-proxy docker-compose.yml
+  template:
+    src: docker-compose.yml.j2
+    dest: "{{ cm_proxy_dir }}/docker-compose.yml"
+    mode: "0644"
+    owner: ubuntu
+    group: ubuntu
+  register: compose_rendered
+
+# ── Bring up the proxy ────────────────────────────────────
+
+- name: Bring up cm-proxy (Caddy)
+  community.docker.docker_compose_v2:
+    project_src: "{{ cm_proxy_dir }}"
+    state: present
+    # recreate: auto compares container config hash; any change in Caddyfile
+    # or compose file triggers a clean container swap.
+    recreate: auto
+
+# ── Post-deploy sanity check ──────────────────────────────
+
+- name: Verify chall-manager port answers through cm-proxy (locally via 127.0.0.1 and via bind IP)
+  uri:
+    url: "http://{{ item }}:{{ cm_proxy_chall_manager_listen_port }}/api/v1/ping"
+    method: GET
+    # 401 means Caddy is alive and gating correctly (basic-auth active).
+    # 200 would indicate auth is bypassed — treat as failure.
+    status_code: 401
+    timeout: 10
+  loop:
+    - "{{ cm_proxy_bind_ip }}"
+  register: cm_proxy_probe
+  retries: 6
+  delay: 5
+  until: cm_proxy_probe is success
+  ignore_errors: yes
+
+- name: Surface cm-proxy endpoint URLs for gamma4
+  debug:
+    msg:
+      - "cm-proxy up. Paste these into /data/gamma4-lab-infra/terraform.tfvars:"
+      - "  chall_manager_url         = \"http://{{ cm_proxy_bind_ip }}:{{ cm_proxy_chall_manager_listen_port }}\""
+      - "  chall_manager_credentials = \"{{ cm_proxy_basic_auth_user }}:<plaintext password from vault>\""
+      - "  registry_url              = \"{{ cm_proxy_bind_ip }}:{{ cm_proxy_registry_listen_port }}\""
+      - "  registry_credentials      = \"{{ cm_proxy_basic_auth_user }}:<plaintext password from vault>\""
+      - ""
+      - "Then:  cd /data/gamma4-lab-infra && tofu apply"

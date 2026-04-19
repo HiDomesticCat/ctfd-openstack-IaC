@@ -9,6 +9,9 @@ override.tf
 override.tf.json
 *_override.tf
 *_override.tf.json
+# Saved plans (may contain credentials / sensitive config)
+*.tfplan
+tfplan
 
 # 各層目錄內的 tfvars（舊結構，向下相容）
 platform/terraform.tfvars

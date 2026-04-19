@@ -1,0 +1,18 @@
+# roles/cm-proxy/handlers/main.yml
+#
+# Caddyfile is bind-mounted into the container, so changing it does NOT
+# alter docker-compose's container config hash — docker_compose_v2 with
+# `recreate: auto` will not see a change and will skip restart. We
+# explicitly restart Caddy here when the Caddyfile template diff triggers
+# the `Render Caddyfile` task's `notify`.
+#
+# Caddy supports SIGUSR1 for config reload without full restart, but
+# `docker exec cm-proxy-caddy-1 caddy reload` requires the caddy binary
+# to find the matching config — simpler to just restart the container.
+
+- name: Restart cm-proxy Caddy
+  community.docker.docker_compose_v2:
+    project_src: "{{ cm_proxy_dir }}"
+    services:
+      - caddy
+    state: restarted

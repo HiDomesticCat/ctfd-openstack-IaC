@@ -12,6 +12,26 @@
   roles:
     - chall-manager  # chall-manager 後端微服務（含 k3s-pod scenario 建置）
 
+# ── Phase 3 α-exposure：Caddy reverse proxy for gamma4 VM ───
+# 只在 expose_cm_proxy_to_challenge_net=true + 跑過 tofu apply 之後才有效。
+# Caddy 綁在 CTFd VM 的 challenge-net NIC，basic-auth 保護 chall-manager
+# 和 local registry，供 gamma4 research VM 存取。
+#
+# 前置：
+#   1. /data/ctfd-openstack-IaC/ctfd/terraform.tfvars 設定：
+#        expose_cm_proxy_to_challenge_net = true
+#        cm_proxy_allowed_cidr            = "<gamma4 VM challenge-net IP>/32"
+#      跑完 tofu apply
+#   2. ansible/group_vars/all/vault.yml 填入：
+#        vault_cm_proxy_basic_auth_user, _password, _hash（用 `caddy hash-password`）
+#
+# 這個 play 本身是 idempotent 的；role 內部的 assert 會在前置沒做時明確失敗。
+- name: 部署 cm-proxy（Caddy + basic-auth 反代 chall-manager + registry）
+  hosts: ctfd
+  become: yes
+  roles:
+    - cm-proxy
+
 # ── Chell Shell Challenge 後端（k3s 叢集）────────────────
 # 需搭配 ansible/inventory/k3s_hosts.ini（由 chell/ tofu 自動產生）
 # 執行指令：

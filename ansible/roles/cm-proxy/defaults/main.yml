@@ -1,0 +1,12 @@
+# roles/cm-proxy/defaults/main.yml
+#
+# Overridable defaults. Real secrets come from group_vars/all/vault.yml
+# (see cm_proxy_basic_auth_hash / cm_proxy_basic_auth_user in vars/main.yml).
+
+# The challenge-net /24 the CTFd VM has a port on. Used to pick the right
+# ansible fact (ansible_interface.ipv4.address) for Caddy to bind to.
+cm_proxy_challenge_net_cidr: "192.168.78.0/24"
+
+# Caddy access log retention. Caddy rotates via its built-in roll_size;
+# keep the last N days of rolled logs on disk.
+cm_proxy_log_retention_days: 14
