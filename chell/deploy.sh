@@ -47,11 +47,18 @@ success "tofu apply 完成"
 info "[2/3] 擷取 tofu outputs..."
 
 MASTER_IP=$(tofu output -raw master_floating_ip)
-WORKER_IPS_JSON=$(tofu output -json worker_floating_ips)
+WORKER_MGMT_IPS_JSON=$(tofu output -json worker_floating_ips)
+if K3S_WORKER_IPS_JSON=$(tofu output -json worker_challenge_net_ips 2>/dev/null) && [[ "$K3S_WORKER_IPS_JSON" != "[]" ]]; then
+  K3S_WORKER_IPS_LABEL="worker challenge-net IPs"
+else
+  K3S_WORKER_IPS_JSON="$WORKER_MGMT_IPS_JSON"
+  K3S_WORKER_IPS_LABEL="worker floating IPs (fallback)"
+fi
 K3S_API_URL=$(tofu output -raw k3s_api_url 2>/dev/null || echo "https://${MASTER_IP}:6443")
 
 echo "    Master floating IP : $MASTER_IP"
-echo "    Worker floating IPs: $WORKER_IPS_JSON"
+echo "    Worker floating IPs: $WORKER_MGMT_IPS_JSON"
+echo "    K3S_WORKER_IPS     : $K3S_WORKER_IPS_JSON ($K3S_WORKER_IPS_LABEL)"
 echo "    k3s API URL        : $K3S_API_URL"
 
 if [[ "$SKIP_ANSIBLE" == "true" ]]; then
@@ -62,7 +69,7 @@ if [[ "$SKIP_ANSIBLE" == "true" ]]; then
   echo "  ansible-playbook site.yml \\"
   echo "    -i inventory/hosts.ini \\"
   echo "    -i inventory/k3s_hosts.ini \\"
-  echo "    --extra-vars '{\"k3s_worker_ips\": $WORKER_IPS_JSON}' \\"
+  echo "    --extra-vars '{\"k3s_worker_ips\": $K3S_WORKER_IPS_JSON}' \\"
   echo "    --ask-vault-pass"
   exit 0
 fi
@@ -71,7 +78,7 @@ fi
 # 只等 SSH（port 22），不等 k3s API（port 6443）
 # 因為 k3s 是由 Ansible 安裝的，等 6443 會永遠卡住
 ALL_IPS=("$MASTER_IP")
-for ip in $(echo "$WORKER_IPS_JSON" | tr -d '[]"' | tr ',' ' '); do
+for ip in $(echo "$WORKER_MGMT_IPS_JSON" | tr -d '[]"' | tr ',' ' '); do
   ALL_IPS+=("$ip")
 done
 
@@ -102,7 +109,7 @@ ANSIBLE_ARGS=(
   site.yml
   -i inventory/hosts.ini
   -i inventory/k3s_hosts.ini
-  --extra-vars "{\"k3s_worker_ips\": ${WORKER_IPS_JSON}}"
+  --extra-vars "{\"k3s_worker_ips\": ${K3S_WORKER_IPS_JSON}}"
 )
 
 # 只在有 vault 加密檔時才要求密碼

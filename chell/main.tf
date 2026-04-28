@@ -16,7 +16,7 @@
 #      cloud-init 自動安裝 k3s server/agent，產生外部 kubeconfig
 #   5. Ansible 自動化（local_file）：
 #      - ansible/inventory/k3s_hosts.ini         ← master + worker IP
-#      - ansible/group_vars/all/k3s_ids.yml      ← worker floating IPs
+#      - ansible/group_vars/all/k3s_ids.yml      ← worker challenge-net IPs
 #
 # 部署順序：
 #   1. cd ../platform && tofu apply   （取得 external_network_id, image_id）
@@ -140,7 +140,11 @@ module "k3s" {
 # ── 自動產生 Ansible k3s_ids（worker IPs 等因重新 apply 可能改變的值）──
 resource "local_file" "k3s_ids" {
   content = templatefile("${path.module}/templates/k3s_ids.tpl", {
-    worker_ips = module.k3s.worker_floating_ips
+    worker_ips = (
+      length(module.k3s.worker_challenge_net_ips) > 0
+      ? module.k3s.worker_challenge_net_ips
+      : module.k3s.worker_floating_ips
+    )
   })
   filename        = "${path.module}/../ansible/group_vars/all/k3s_ids.yml"
   file_permission = "0644"

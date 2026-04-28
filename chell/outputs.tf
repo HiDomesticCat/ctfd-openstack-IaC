@@ -6,8 +6,13 @@ output "master_floating_ip" {
 }
 
 output "worker_floating_ips" {
-  description = "k3s worker 外部 IP 清單（玩家 challenge NodePort 連線用）"
+  description = "k3s worker 外部 IP 清單（管理/備援用；challenge 連線優先使用 worker_challenge_net_ips）"
   value       = module.k3s.worker_floating_ips
+}
+
+output "worker_challenge_net_ips" {
+  description = "k3s worker 在 challenge-net 上的 IP 清單（Caldera/玩家 challenge NodePort 連線用）"
+  value       = module.k3s.worker_challenge_net_ips
 }
 
 output "k3s_api_url" {
@@ -26,8 +31,12 @@ output "kubeconfig_fetch_command" {
 }
 
 output "k3s_worker_ips_csv" {
-  description = "worker IP 逗號分隔（填入 ansible/group_vars/all/challenge.yml 的 k3s_worker_ips）"
-  value       = join(",", module.k3s.worker_floating_ips)
+  description = "worker challenge-net IP 逗號分隔（chall-manager k8s-pod connection_info 使用）"
+  value = join(",", (
+    length(module.k3s.worker_challenge_net_ips) > 0
+    ? module.k3s.worker_challenge_net_ips
+    : module.k3s.worker_floating_ips
+  ))
 }
 
 output "next_steps" {
@@ -35,8 +44,8 @@ output "next_steps" {
   value       = <<-EOT
     ✅ k3s 叢集已建立！接下來：
 
-    1. 複製 worker IP 到 challenge.yml：
-       k3s_worker_ips: [${join(", ", [for ip in module.k3s.worker_floating_ips : "\"${ip}\""])}]
+    1. chall-manager 會透過 ansible/group_vars/all/k3s_ids.yml 使用 worker challenge-net IP：
+       k3s_worker_ips: [${join(", ", [for ip in(length(module.k3s.worker_challenge_net_ips) > 0 ? module.k3s.worker_challenge_net_ips : module.k3s.worker_floating_ips) : "\"${ip}\""])}]
 
     2. 執行 Ansible 配置叢集：
        ansible-playbook site.yml \

@@ -41,6 +41,7 @@ except ImportError:
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 CHALLENGES_DIR = PROJECT_ROOT / "challenges"
 DEFAULTS_FILE = PROJECT_ROOT / "challenge_defaults.yml"
+GENERATED_IDS_FILE = PROJECT_ROOT / "ansible" / "group_vars" / "all" / "challenge_ids.yml"
 
 
 def load_env():
@@ -63,7 +64,32 @@ def load_defaults():
     if not DEFAULTS_FILE.exists():
         return {}
     with open(DEFAULTS_FILE) as f:
-        return yaml.safe_load(f) or {}
+        defaults = yaml.safe_load(f) or {}
+    return apply_generated_ids(defaults)
+
+
+def apply_generated_ids(defaults):
+    """將 ctfd/tofu 自動產生的 network/image/SG IDs 合併到 openstack-vm defaults."""
+    if not GENERATED_IDS_FILE.exists():
+        return defaults
+
+    with open(GENERATED_IDS_FILE) as f:
+        generated = yaml.safe_load(f) or {}
+
+    openstack_defaults = defaults.setdefault("openstack-vm", {})
+    if not isinstance(openstack_defaults, dict):
+        return defaults
+
+    if generated.get("challenge_network_id"):
+        openstack_defaults["network_id"] = str(generated["challenge_network_id"])
+    if generated.get("challenge_image_id"):
+        openstack_defaults["image_id"] = str(generated["challenge_image_id"])
+
+    secgroups = generated.get("challenge_secgroup_ids") or {}
+    if isinstance(secgroups, dict) and secgroups.get("allow_all"):
+        openstack_defaults["security_group_id"] = str(secgroups["allow_all"])
+
+    return defaults
 
 
 def load_challenge(path):
@@ -139,6 +165,16 @@ def build_payload(challenge, defaults):
         challenge.get("additional", {}),
         defaults,
     )
+    placeholders = [
+        k for k, v in additional.items()
+        if isinstance(v, str) and v.startswith("REPLACE_")
+    ]
+    if placeholders:
+        raise ValueError(
+            "additional contains unresolved placeholders: "
+            + ", ".join(sorted(placeholders))
+            + ". Run `tofu apply` in ctfd/ so ansible/group_vars/all/challenge_ids.yml is generated."
+        )
 
     payload = {
         "name": challenge["name"],

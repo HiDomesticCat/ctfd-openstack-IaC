@@ -2,7 +2,7 @@
 # 每次 tofu apply（chell 層）後自動更新
 # 如需修改其他 k3s 設定，請編輯 group_vars/all/k3s.yml
 
-# chell tofu output → worker_floating_ips
+# chell tofu output → worker challenge-net IPs（fallback: worker_floating_ips）
 k3s_worker_ips:
 %{ for ip in worker_ips ~}
   - "${ip}"
