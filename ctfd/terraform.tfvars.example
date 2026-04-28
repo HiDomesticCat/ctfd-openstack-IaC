@@ -38,3 +38,26 @@ floating_ip_pool = "public"
 
 # CTFd 應用程式 Port
 ctfd_port = 8000
+
+# ── Phase 3 α-exposure (gamma4 research VM 整合) ─────────────
+# Set the four below + tofu apply when you want gamma4 to talk to
+# chall-manager + registry through cm-proxy on challenge-net.
+#
+# expose_cm_proxy_to_challenge_net = true
+# cm_proxy_allowed_cidr            = "<gamma4 challenge-net IP>/32"
+# cm_proxy_chall_manager_port      = 8443
+# cm_proxy_registry_port           = 5443
+# cm_proxy_fixed_ip                = "<CTFd VM challenge-net IP, e.g. 192.168.78.162>"
+
+# ── K3s direct registry ingress on challenge-net ────────────
+# K3s workers have no route to the CTFd internal subnet
+# (192.168.100.0/24), so the k8s-pod scenario rewrites image refs to
+# <ctfd_challenge_net_ip>:5000 and pulls over challenge-net. Open
+# 5000/tcp on the CTFd VM's secgroup to the challenge-net /24:
+#
+# registry_allowed_cidr = "192.168.78.0/24"
+#
+# Pair this with the worker side:
+#   /etc/rancher/k3s/registries.yaml on each worker must mirror
+#   "<ctfd_challenge_net_ip>:5000" -> "http://<ctfd_challenge_net_ip>:5000"
+#   then `sudo systemctl restart k3s-agent` to reload containerd.
