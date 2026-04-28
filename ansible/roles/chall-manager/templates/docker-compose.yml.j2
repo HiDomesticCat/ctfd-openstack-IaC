@@ -55,7 +55,10 @@ services:
 {% endif %}
 
       # k8s-pod image registry prefix（challenge.yml 只需寫 image 名稱）
-      CHALLENGE_REGISTRY: "{{ ctfd_internal_ip }}:{{ registry_port }}"
+      # Use challenge-net IP so K3s workers can pull (they have no route to
+      # the CTFd internal subnet 192.168.100.0/24). Falls back to internal
+      # IP when cm-proxy is not exposed to challenge-net (Phase 2 only).
+      CHALLENGE_REGISTRY: "{{ chall_manager_registry_advertise_ip }}:{{ registry_port }}"
 
       # Pulumi local backend（不需要 Pulumi Cloud 帳號）
       PULUMI_BACKEND_URL: "file:///pulumi-state"

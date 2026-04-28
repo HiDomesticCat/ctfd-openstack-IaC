@@ -30,6 +30,15 @@ registry_port: 5000
 registry_host: "localhost"
 # CTFd 主機內網 IP（k3s 節點 pull image 用，由 ansible fact 自動取得）
 ctfd_internal_ip: "{{ ansible_default_ipv4.address }}"
+# IP that K3s workers use to pull challenge images. The CTFd VM's default
+# IPv4 sits on the internal subnet (192.168.100.0/24) which workers cannot
+# route to; when the CTFd VM also has a NIC on challenge-net we advertise
+# that IP instead so worker→registry traffic stays inside the closed VXLAN.
+# Resolved by matching ansible_all_ipv4_addresses against the challenge-net
+# CIDR (same logic the cm-proxy role uses for cm_proxy_bind_ip). Falls back
+# to the internal IP for non-Phase3 deployments where the NIC is absent.
+chall_manager_challenge_net_cidr: "192.168.78.0/24"
+chall_manager_registry_advertise_ip: "{{ ansible_all_ipv4_addresses | select('match', '^' ~ chall_manager_challenge_net_cidr.split('/')[0].rsplit('.', 1)[0] | regex_escape ~ '\\.') | list | first | default(ctfd_internal_ip, true) }}"
 registry_url: "{{ registry_host }}:{{ registry_port }}"
 # ✅ chall-manager 容器內要用 Docker service name（不是 localhost）
 # localhost 在容器內指向容器本身，registry 是 docker-compose 定義的 service name
