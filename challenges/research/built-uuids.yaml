@@ -1,0 +1,6 @@
+schema_version: "1.0"
+# Canonical record: component_id -> Glance UUID for our lab.
+# Updated by `make bake/<id>`. Mirrored back to gamma4-lab via
+# scripts/sync_image_registry.py.
+built_images: {}
+
