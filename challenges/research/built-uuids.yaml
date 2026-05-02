@@ -1,6 +1,6 @@
 schema_version: '1.0'
 built_images:
   lab-pwnkit-cve-2021-4034:
-    glance_image_id: 36218241-2213-45c3-b360-f2201eac9b7c
-    built_at: '2026-05-02T13:21:21Z'
-    gamma4_sha: 52a2519cbbdeecd4f47987020c3e41b4ae852841
+    glance_image_id: f1e119c8-b550-48dc-976f-b14f29fbe707
+    built_at: '2026-05-02T15:00:59Z'
+    gamma4_sha: e89c4fad428b366bf344fd7b4743b97754ecc2d5

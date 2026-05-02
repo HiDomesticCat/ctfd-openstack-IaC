@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -41,6 +42,28 @@ PWNKIT_ARCHIVED_APT = (
     "rm -rf \"$tmp\""
 )
 
+PWNKIT_REFEXPLOIT_WRAPPER = """#!/bin/sh
+set -eu
+cd /opt/pwnkit
+if [ "$#" -gt 0 ]; then
+  printf '%s\\nexit\\n' "$*" | ./cve-2021-4034
+else
+  printf 'id\\ncat /root/flag.txt\\ncat /etc/passwd | head -1\\nexit\\n' | ./cve-2021-4034
+fi
+"""
+
+
+def _patch_pwnkit_wrapper(step: str) -> str:
+    if not step.startswith("sudo tee /opt/pwnkit/exploit "):
+        return step
+    if "exec ./cve-2021-4034" not in step:
+        return step
+    match = re.search(r"<<'([^']+)'\n.*\n\1$", step, flags=re.DOTALL)
+    if not match:
+        return step
+    tag = match.group(1)
+    return f"sudo tee /opt/pwnkit/exploit >/dev/null <<'{tag}'\n{PWNKIT_REFEXPLOIT_WRAPPER}{tag}"
+
 
 def main() -> int:
     if len(sys.argv) != 2:
@@ -55,6 +78,7 @@ def main() -> int:
             step = step.replace(old, new)
         if step == PWNKIT_PINNED_APT:
             step = PWNKIT_ARCHIVED_APT
+        step = _patch_pwnkit_wrapper(step)
         patched.append(step)
 
     path.write_text(json.dumps(patched, indent=2) + "\n", encoding="utf-8")
