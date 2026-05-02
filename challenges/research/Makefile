@@ -53,8 +53,7 @@ bake/%:
 	    -var "source_image_id=$$IMAGE_ID" \
 	    -var "network_id=$$NETWORK_ID" \
 	    research-vm-base.pkr.hcl ; \
-	PREFIX=$$(jq -r '.image_name_prefix' $(WORK)/m.json) ; \
-	NEW_UUID=$$(openstack image list --private --name "$$PREFIX-*" --sort-column Created_at --sort-desc -f value -c ID | head -n 1) ; \
+	NEW_UUID=$$(openstack image list --private --property component_id=$* --sort created_at:desc -f value -c ID | head -n 1) ; \
 	test -n "$$NEW_UUID" || { echo "ERROR: failed to locate fresh Glance image for $*"; exit 1; } ; \
 	echo "" ; echo ">>> $* baked. Glance UUID: $$NEW_UUID" ; \
 	mkdir -p $(CURDIR)/specs ; \
