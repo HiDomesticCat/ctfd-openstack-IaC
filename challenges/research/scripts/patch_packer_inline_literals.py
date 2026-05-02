@@ -9,7 +9,8 @@ from pathlib import Path
 
 
 REPLACEMENTS = {
-    "{{FLAG}}": '{{"{{"}}FLAG{{"}}"}}',
+    "{{FLAG}}": "FLAG_PLACEHOLDER",
+    '{{"{{"}}FLAG{{"}}"}}': "FLAG_PLACEHOLDER",
 }
 
 
