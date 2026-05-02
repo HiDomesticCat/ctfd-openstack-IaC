@@ -40,8 +40,13 @@ bake/%:
 	    eval "test -n \"\$$$$v\"" || { echo "ERROR: $$v not set; export it before running make (suggestion: $$v=\$$(openssl rand -hex 16))"; exit 1; } ; \
 	done ; \
 	cd $(WORK)/gamma4-lab/bake_infrastructure && \
+	python3 $(CURDIR)/scripts/patch_packer_env_vars.py research-vm-base.pkr.hcl && \
 	echo ">>> packer init" && \
 	packer init research-vm-base.pkr.hcl && \
+	export PKR_VAR_root_password="$$ROOT_PASSWORD" \
+	    PKR_VAR_attacker_password="$$ATTACKER_PASSWORD" \
+	    PKR_VAR_extra_user_password="$${EXTRA_USER_PASSWORD:-}" \
+	    PKR_VAR_victim_password="$${VICTIM_PASSWORD:-}" ; \
 	echo ">>> packer build (Ubuntu $$OS_VER, image $$IMAGE_ID)" && \
 	packer build \
 	    -var "spec_metadata_path=$(WORK)/m.json" \
@@ -52,7 +57,7 @@ bake/%:
 	    -var "openstack_project_name=$$OS_PROJECT_NAME" \
 	    -var "source_image_id=$$IMAGE_ID" \
 	    -var "network_id=$$NETWORK_ID" \
-	    research-vm-base.pkr.hcl ; \
+	    research-vm-base.pkr.hcl || exit 1 ; \
 	NEW_UUID=$$(openstack image list --private --property component_id=$* --sort created_at:desc -f value -c ID | head -n 1) ; \
 	test -n "$$NEW_UUID" || { echo "ERROR: failed to locate fresh Glance image for $*"; exit 1; } ; \
 	echo "" ; echo ">>> $* baked. Glance UUID: $$NEW_UUID" ; \
