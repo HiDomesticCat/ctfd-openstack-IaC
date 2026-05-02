@@ -1,0 +1,61 @@
+# Vulnerability state spec for lab-shadow-read-t1003.008.
+# Schema: catalog/schema/vulnerability.spec.schema.json
+# Architecture: docs/adr/0008-spec-build-separation.md
+#
+# Post-root credential dump scenario (T1003.008 OS Credential Dumping:
+# /etc/passwd and /etc/shadow). Deployment bootstraps shell:root via
+# root-SSH; player demonstrates `cat /etc/shadow` and observes shadow-
+# format hashes. A non-root victim user is planted ONLY so /etc/shadow
+# carries multiple $6$ hash rows (so the dump is non-trivially long
+# and the success_signal pattern matches more reliably).
+
+schema_version: "1.0"
+component_id: lab-shadow-read-t1003.008
+description: "Ubuntu 22.04 with root SSH and a planted non-root user so /etc/shadow has multiple SHA-512 ($6$) hash rows"
+
+base:
+  os_family: ubuntu
+  os_version: "22.04"
+
+packages:
+  apt:
+    install_latest:
+      - openssh-server
+      - ca-certificates
+
+users:
+  # The 'victim' user is data-shaping, not access-granting. They exist solely
+  # so /etc/shadow has at least one non-root $6$ hash row. The player never
+  # logs in as victim — only root SSH is exposed (per ssh.permit_root_login).
+  - name: victim
+    password_from_var: extra_user_password
+    shell: /bin/bash
+    sudo: false
+
+ssh:
+  permit_root_login: true
+  password_authentication: true
+  root_password_from_var: root_password
+
+flag:
+  target_path: /root/flag.txt
+  mode: "0600"
+  owner: root:root
+  cloud_init_template: "{{FLAG}}"
+
+services_enable:
+  - ssh
+
+post_bake_assertions:
+  # Modern Ubuntu 22.04 (jammy) defaults to yescrypt ($y$) via PAM; older
+  # systems and chpasswd in different configurations use SHA-512 ($6$).
+  # Both are crypt-format password hashes — the T1003.008 attack semantics
+  # ("dump credentials from /etc/shadow") are independent of which crypt
+  # variant the system happens to use. Accept either as evidence of a
+  # successfully baked vulnerable shadow file.
+  - description: "/etc/shadow has root crypt hash row ($6$ SHA-512 or $y$ yescrypt)"
+    command: "sudo grep -qE '^root:\\$(6|y)\\$' /etc/shadow"
+  - description: "/etc/shadow has victim crypt hash row (multi-row dump target)"
+    command: "sudo grep -qE '^victim:\\$(6|y)\\$' /etc/shadow"
+  - description: "SSH listening with root login enabled (deployment bootstrap)"
+    command: "ss -ltn | grep -q ':22' && grep -q '^PermitRootLogin yes' /etc/ssh/sshd_config.d/*.conf"

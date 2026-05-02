@@ -12,3 +12,7 @@ built_images:
     glance_image_id: 3d2d21b5-dc2b-4c5a-9882-c6ef90f754da
     built_at: '2026-05-02T15:56:20Z'
     gamma4_sha: 5359bdfe6bc061fb3f2e071d7c505512325e32da
+  lab-shadow-read-t1003.008:
+    glance_image_id: 1a505860-eafd-41a3-bdf0-877a736646dc
+    built_at: '2026-05-02T16:29:30Z'
+    gamma4_sha: 5e6eecd3e5f85d3ac74096c52d1b977a915aea02
