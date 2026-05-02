@@ -28,6 +28,7 @@ bake/%:
 	cd gamma4-lab && uv run python bake_infrastructure/spec_to_provisioner.py \
 	    catalog/components/$*/bake/vulnerability.spec.yaml \
 	    --metadata-out $(WORK)/m.json --steps-out $(WORK)/s.json ; \
+	python3 $(CURDIR)/scripts/patch_packer_inline_literals.py $(WORK)/s.json ; \
 	OS_VER=$$(jq -r '.os_version' $(WORK)/m.json) ; \
 	case "$$OS_VER" in \
 	    "20.04") IMAGE_ID="$$BASE_IMAGE_UBUNTU_2004" ;; \
