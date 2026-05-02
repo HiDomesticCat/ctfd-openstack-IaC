@@ -16,3 +16,7 @@ built_images:
     glance_image_id: 1a505860-eafd-41a3-bdf0-877a736646dc
     built_at: '2026-05-02T16:29:30Z'
     gamma4_sha: 5e6eecd3e5f85d3ac74096c52d1b977a915aea02
+  lab-oracle-phase1-sqli-pivot:
+    glance_image_id: 4b7ec3c6-2e12-4f7d-a009-ee5e0bc29d8d
+    built_at: '2026-05-02T16:38:39Z'
+    gamma4_sha: 5e6eecd3e5f85d3ac74096c52d1b977a915aea02
