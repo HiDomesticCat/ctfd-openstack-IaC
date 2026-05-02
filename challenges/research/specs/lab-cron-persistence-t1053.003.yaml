@@ -1,0 +1,46 @@
+# Vulnerability state spec for lab-cron-persistence-t1053.003.
+# Schema: catalog/schema/vulnerability.spec.schema.json
+# Architecture: docs/adr/0008-spec-build-separation.md
+#
+# This is a post-root persistence scenario (T1053.003 Cron). The deployment
+# bootstraps shell:root via root-SSH so the player can demonstrate
+# /etc/cron.d-based persistence; chains naturally upstream from any
+# component that yields shell:root (e.g. lab-pwnkit-cve-2021-4034).
+
+schema_version: "1.0"
+component_id: lab-cron-persistence-t1053.003
+description: "Ubuntu 22.04 with root SSH and a running cron daemon; player demonstrates persistence via /etc/cron.d write"
+
+base:
+  os_family: ubuntu
+  os_version: "22.04"
+
+packages:
+  apt:
+    install_latest:
+      - cron
+      - openssh-server
+      - ca-certificates
+
+ssh:
+  permit_root_login: true
+  password_authentication: true
+  root_password_from_var: root_password
+
+flag:
+  target_path: /root/flag.txt
+  mode: "0600"
+  owner: root:root
+  cloud_init_template: "{{FLAG}}"
+
+services_enable:
+  - cron
+  - ssh
+
+post_bake_assertions:
+  - description: "cron daemon running and watching /etc/cron.d"
+    command: "systemctl is-active cron && test -d /etc/cron.d && test -w /etc/cron.d"
+  - description: "SSH listening with root login enabled"
+    command: "ss -ltn | grep -q ':22' && grep -q '^PermitRootLogin yes' /etc/ssh/sshd_config.d/*.conf"
+  - description: "Flag placeholder file in place at correct mode"
+    command: "test -f /root/flag.txt && stat -c '%a' /root/flag.txt | grep -q '600'"

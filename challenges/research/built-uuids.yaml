@@ -4,3 +4,7 @@ built_images:
     glance_image_id: f1e119c8-b550-48dc-976f-b14f29fbe707
     built_at: '2026-05-02T15:00:59Z'
     gamma4_sha: e89c4fad428b366bf344fd7b4743b97754ecc2d5
+  lab-cron-persistence-t1053.003:
+    glance_image_id: 1226dfd2-84b6-422d-a4e9-c4321a521a36
+    built_at: '2026-05-02T15:46:21Z'
+    gamma4_sha: 5359bdfe6bc061fb3f2e071d7c505512325e32da
