@@ -1,0 +1,78 @@
+# Vulnerability state spec for lab-file-discovery-t1083.
+# Schema: catalog/schema/vulnerability.spec.schema.json
+# Architecture: docs/adr/0008-spec-build-separation.md
+#
+# Reconnaissance scenario (T1083 File and Directory Discovery). The
+# deployment bootstraps shell:any_user via attacker:attacker SSH; player
+# demonstrates filesystem enumeration (find / ls / locate) and locates
+# the planted honey-files. Discovery does NOT escalate — see the
+# composition_hints note in component.yaml on the algebra semantics.
+#
+# Honey-files at /opt/secret_config.bak and /var/tmp/db_creds.bak are
+# world-readable so the unprivileged attacker can both find AND cat them.
+
+schema_version: "1.0"
+component_id: lab-file-discovery-t1083
+description: "Ubuntu 22.04 with attacker:attacker non-root SSH and two world-readable honey-files containing CONFIDENTIAL_DATA_FOUND"
+
+base:
+  os_family: ubuntu
+  os_version: "22.04"
+
+packages:
+  apt:
+    install_latest:
+      - openssh-server
+      - ca-certificates
+
+users:
+  # The unprivileged player entry point. shell:any_user prerequisite is
+  # satisfied by the player SSHing in as this account.
+  - name: attacker
+    password_from_var: attacker_password
+    shell: /bin/bash
+    sudo: false
+
+ssh:
+  # Root SSH is denied — discovery starts from a non-root shell. Player
+  # cannot read /root/flag.txt without chaining an LPE in front of this
+  # component (current matrix scope evaluates discovery in isolation).
+  permit_root_login: false
+  password_authentication: true
+  # Even with root SSH off, the system root password is set so the bake
+  # can sudo and admin recovery is possible.
+  root_password_from_var: root_password
+
+files_static:
+  # Primary honey-file. Contains the canonical content marker.
+  - target_path: /opt/secret_config.bak
+    content: "CONFIDENTIAL_DATA_FOUND\n"
+    owner: root:root
+    mode: "0644"
+  # Secondary honey-file under a different parent dir so multi-path
+  # find-walks (e.g. `find / -name '*creds*'`) also succeed.
+  - target_path: /var/tmp/db_creds.bak
+    content: "CONFIDENTIAL_DATA_FOUND (alt)\n"
+    owner: root:root
+    mode: "0644"
+
+flag:
+  # Secondary objective: only reachable if the player chains an LPE in
+  # front of this component. Out of scope for the matrix's per-cell smoke.
+  target_path: /root/flag.txt
+  mode: "0600"
+  owner: root:root
+  cloud_init_template: "{{FLAG}}"
+
+services_enable:
+  - ssh
+
+post_bake_assertions:
+  - description: "Attacker user exists and is non-root"
+    command: "id attacker | grep -qv 'uid=0'"
+  - description: "Honey-file at /opt/secret_config.bak readable by non-root + contains marker"
+    command: "sudo -u attacker test -r /opt/secret_config.bak && sudo -u attacker grep -q 'CONFIDENTIAL_DATA_FOUND' /opt/secret_config.bak"
+  - description: "Secondary honey-file at /var/tmp/db_creds.bak readable by non-root"
+    command: "sudo -u attacker test -r /var/tmp/db_creds.bak"
+  - description: "SSH listening with root login DENIED (player must come in as attacker)"
+    command: "ss -ltn | grep -q ':22' && grep -q '^PermitRootLogin no' /etc/ssh/sshd_config.d/*.conf"
