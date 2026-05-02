@@ -9,9 +9,9 @@ built_images:
     built_at: '2026-05-02T15:46:21Z'
     gamma4_sha: 5359bdfe6bc061fb3f2e071d7c505512325e32da
   lab-file-discovery-t1083:
-    glance_image_id: 3d2d21b5-dc2b-4c5a-9882-c6ef90f754da
-    built_at: '2026-05-02T15:56:20Z'
-    gamma4_sha: 5359bdfe6bc061fb3f2e071d7c505512325e32da
+    glance_image_id: cea249c8-89b2-4928-8d27-6cab83349f15
+    built_at: '2026-05-02T17:39:51Z'
+    gamma4_sha: 8c8a4cd8e22c606c4690040a448ecc9634366215
   lab-shadow-read-t1003.008:
     glance_image_id: 1a505860-eafd-41a3-bdf0-877a736646dc
     built_at: '2026-05-02T16:29:30Z'
